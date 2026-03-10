@@ -30,7 +30,7 @@ export function TicketReceipt({ ticket, settings, onPrint }: TicketReceiptProps)
     const printContent = printRef.current
     if (!printContent) return
 
-    const width = settings.printer_width === '58mm' ? '48mm' : '72mm'
+    const width = settings.printer_width === '58mm' ? '58mm' : '80mm'
 
     const iframe = document.createElement('iframe')
     iframe.style.position = 'fixed'
@@ -56,7 +56,7 @@ export function TicketReceipt({ ticket, settings, onPrint }: TicketReceiptProps)
         <style>
           @page {
             size: ${width} auto;
-            margin: 2mm;
+            margin: 1mm;
           }
           * {
             margin: 0;
@@ -64,50 +64,87 @@ export function TicketReceipt({ ticket, settings, onPrint }: TicketReceiptProps)
             box-sizing: border-box;
           }
           body {
-            font-family: 'Courier New', monospace;
-            font-size: 10px;
-            line-height: 1.3;
+            font-family: 'Arial Black', 'Arial', sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
             color: #000;
             background: #fff;
-            width: ${width};
+            width: 100%;
+            font-weight: bold;
           }
           .receipt {
             padding: 2mm;
+            width: 100%;
           }
           .header {
             text-align: center;
-            margin-bottom: 4px;
+            margin-bottom: 6px;
           }
           .shop-name {
-            font-size: 14px;
-            font-weight: bold;
+            font-size: 18px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 1px;
           }
-          .divider {
-            border-top: 1px dashed #000;
-            margin: 4px 0;
-          }
-          .ticket-id {
-            text-align: center;
+          .shop-phone {
             font-size: 12px;
             font-weight: bold;
           }
-          .row {
-            margin: 2px 0;
+          .divider {
+            border-top: 2px dashed #000;
+            margin: 6px 0;
           }
-          .label {
+          .ticket-id {
+            text-align: center;
+            font-size: 16px;
+            font-weight: 900;
+            padding: 4px 0;
+          }
+          .date {
+            text-align: center;
+            font-size: 11px;
             font-weight: bold;
           }
+          .row {
+            margin: 4px 0;
+            font-size: 12px;
+            font-weight: bold;
+          }
+          .label {
+            font-weight: 900;
+            text-transform: uppercase;
+          }
+          .section-title {
+            font-size: 13px;
+            font-weight: 900;
+            text-transform: uppercase;
+            margin-top: 6px;
+          }
           .accessories {
-            margin-left: 8px;
+            margin-left: 4px;
+            font-size: 11px;
+            font-weight: bold;
           }
           .qr-section {
             text-align: center;
-            margin: 8px 0;
+            margin: 10px 0;
+          }
+          .qr-section img {
+            display: block;
+            margin: 0 auto;
+          }
+          .qr-text {
+            font-size: 10px;
+            font-weight: bold;
+            margin-top: 4px;
           }
           .footer {
             text-align: center;
-            font-size: 8px;
-            margin-top: 8px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-top: 10px;
+            padding-top: 6px;
+            border-top: 2px dashed #000;
           }
         </style>
       </head>
@@ -162,7 +199,7 @@ export function TicketReceipt({ ticket, settings, onPrint }: TicketReceiptProps)
         <QRCodeCanvas 
           id={`qr-receipt-${ticket.id.replace(/[^a-zA-Z0-9]/g, '')}`}
           value={ticket.id} 
-          size={60} 
+          size={80} 
         />
       </div>
 
@@ -170,17 +207,15 @@ export function TicketReceipt({ ticket, settings, onPrint }: TicketReceiptProps)
         <div className="receipt">
           {/* Header */}
           <div className="header">
-            <div className="shop-name">{settings.shop_name || 'MI TALLER'}</div>
-            {settings.shop_phone && <div>{settings.shop_phone}</div>}
+            <div className="shop-name">{settings.shop_name || 'MULTIPLANET'}</div>
+            {settings.shop_phone && <div className="shop-phone">{settings.shop_phone}</div>}
           </div>
 
           <div className="divider"></div>
 
           {/* Ticket ID & Date */}
           <div className="ticket-id">TICKET: {ticket.id}</div>
-          <div style={{ textAlign: 'center', fontSize: '9px' }}>
-            {formatDate(ticket.created_at)}
-          </div>
+          <div className="date">{formatDate(ticket.created_at)}</div>
 
           <div className="divider"></div>
 
@@ -201,17 +236,17 @@ export function TicketReceipt({ ticket, settings, onPrint }: TicketReceiptProps)
           <div className="divider"></div>
 
           {/* Problem */}
-          <div className="row"><span className="label">PROBLEMA:</span></div>
-          <div style={{ fontSize: '9px', marginLeft: '4px' }}>{ticket.problem_description}</div>
+          <div className="section-title">Problema:</div>
+          <div className="row">{ticket.problem_description}</div>
 
           {/* Accessories */}
           {accessories.length > 0 && (
             <>
               <div className="divider"></div>
-              <div className="row"><span className="label">ACCESORIOS:</span></div>
+              <div className="section-title">Accesorios:</div>
               <div className="accessories">
                 {accessories.map((acc: string, i: number) => (
-                  <div key={i}>- {acc}</div>
+                  <div key={i}>• {acc}</div>
                 ))}
               </div>
             </>
@@ -238,13 +273,13 @@ export function TicketReceipt({ ticket, settings, onPrint }: TicketReceiptProps)
 
           {/* QR Code */}
           <div className="qr-section">
-            {qrDataUrl && <img src={qrDataUrl} alt="QR" style={{ width: '50px', height: '50px', margin: '0 auto' }} />}
-            <div style={{ fontSize: '8px' }}>Escanear para estado</div>
+            {qrDataUrl && <img src={qrDataUrl} alt="QR" style={{ width: '70px', height: '70px' }} />}
+            <div className="qr-text">Escanear para estado</div>
           </div>
 
           {/* Footer */}
           <div className="footer">
-            <div>Conserve este ticket</div>
+            <div>CONSERVE ESTE TICKET</div>
             <div>Gracias por su preferencia</div>
           </div>
         </div>

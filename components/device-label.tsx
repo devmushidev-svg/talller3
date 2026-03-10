@@ -14,11 +14,9 @@ interface DeviceLabelProps {
 
 export function DeviceLabel({ ticket, settings, onPrint }: DeviceLabelProps) {
   const printRef = useRef<HTMLDivElement>(null)
-  const qrRef = useRef<HTMLCanvasElement>(null)
   const [qrDataUrl, setQrDataUrl] = useState<string>("")
 
   useEffect(() => {
-    // Convert QR canvas to data URL after render
     const timer = setTimeout(() => {
       const canvas = document.querySelector(`#qr-canvas-${ticket.id.replace(/[^a-zA-Z0-9]/g, '')}`) as HTMLCanvasElement
       if (canvas) {
@@ -56,7 +54,7 @@ export function DeviceLabel({ ticket, settings, onPrint }: DeviceLabelProps) {
         <style>
           @page {
             size: 58mm auto;
-            margin: 2mm;
+            margin: 1mm;
           }
           * {
             margin: 0;
@@ -64,55 +62,65 @@ export function DeviceLabel({ ticket, settings, onPrint }: DeviceLabelProps) {
             box-sizing: border-box;
           }
           body {
-            font-family: 'Courier New', monospace;
-            font-size: 10px;
+            font-family: 'Arial Black', 'Arial', sans-serif;
+            font-size: 12px;
             line-height: 1.3;
             color: #000;
             background: #fff;
+            width: 100%;
+            font-weight: bold;
           }
           .label {
-            width: 48mm;
-            max-width: 48mm;
+            width: 100%;
             padding: 2mm;
-            border: 1px dashed #000;
+            border: 2px dashed #000;
           }
           .header {
             text-align: center;
-            font-size: 8px;
-            font-weight: bold;
-            border-bottom: 1px dashed #000;
-            padding-bottom: 2mm;
-            margin-bottom: 2mm;
+            font-size: 14px;
+            font-weight: 900;
+            text-transform: uppercase;
+            border-bottom: 2px dashed #000;
+            padding-bottom: 3mm;
+            margin-bottom: 3mm;
           }
           .qr-section {
             text-align: center;
-            margin-bottom: 2mm;
+            margin: 4mm 0;
+          }
+          .qr-section img {
+            display: block;
+            margin: 0 auto;
           }
           .ticket-id {
             text-align: center;
-            font-size: 14px;
-            font-weight: bold;
-            margin-bottom: 2mm;
+            font-size: 18px;
+            font-weight: 900;
+            margin: 4mm 0;
+            letter-spacing: 1px;
           }
           .divider {
-            border-top: 1px dashed #000;
-            margin: 2mm 0;
+            border-top: 2px dashed #000;
+            margin: 3mm 0;
           }
           .client-name {
+            font-size: 14px;
+            font-weight: 900;
+            text-align: center;
+            text-transform: uppercase;
+            margin-bottom: 2mm;
+          }
+          .device-info {
+            font-size: 12px;
+            font-weight: bold;
+            text-align: center;
+            text-transform: uppercase;
+            margin-bottom: 2mm;
+          }
+          .date {
             font-size: 11px;
             font-weight: bold;
             text-align: center;
-            margin-bottom: 1mm;
-          }
-          .device-info {
-            font-size: 10px;
-            text-align: center;
-            margin-bottom: 1mm;
-          }
-          .date {
-            font-size: 9px;
-            text-align: center;
-            color: #333;
           }
         </style>
       </head>
@@ -158,7 +166,7 @@ export function DeviceLabel({ ticket, settings, onPrint }: DeviceLabelProps) {
         <QRCodeCanvas 
           id={`qr-canvas-${ticket.id.replace(/[^a-zA-Z0-9]/g, '')}`}
           value={ticket.id} 
-          size={60} 
+          size={100} 
         />
       </div>
 
@@ -167,7 +175,7 @@ export function DeviceLabel({ ticket, settings, onPrint }: DeviceLabelProps) {
           <div className="header">{settings.shop_name || 'MULTIPLANET'}</div>
           
           <div className="qr-section">
-            {qrDataUrl && <img src={qrDataUrl} alt="QR" style={{ width: '50px', height: '50px', margin: '0 auto' }} />}
+            {qrDataUrl && <img src={qrDataUrl} alt="QR" style={{ width: '80px', height: '80px' }} />}
           </div>
           
           <div className="ticket-id">{ticket.id}</div>

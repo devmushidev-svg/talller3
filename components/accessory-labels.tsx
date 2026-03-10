@@ -55,36 +55,44 @@ export function AccessoryLabels({ ticket, onPrint }: AccessoryLabelsProps) {
             box-sizing: border-box;
           }
           body {
-            font-family: 'Courier New', monospace;
-            font-size: 8px;
-            line-height: 1.2;
+            font-family: 'Arial Black', 'Arial', sans-serif;
+            font-size: 11px;
+            line-height: 1.3;
             color: #000;
             background: #fff;
+            width: 100%;
+            font-weight: bold;
             padding: 1mm;
           }
           .label {
-            width: 48mm;
-            border: 1px dashed #000;
-            padding: 2mm;
-            margin-bottom: 2mm;
+            width: 100%;
+            border: 2px dashed #000;
+            padding: 3mm;
+            margin-bottom: 3mm;
             page-break-inside: avoid;
           }
           .ticket-id {
-            font-weight: bold;
-            font-size: 10px;
+            font-weight: 900;
+            font-size: 14px;
             text-align: center;
-            margin-bottom: 1mm;
+            margin-bottom: 2mm;
+            letter-spacing: 1px;
           }
           .accessory {
-            font-weight: bold;
-            font-size: 9px;
+            font-weight: 900;
+            font-size: 13px;
             text-align: center;
-            margin-bottom: 1mm;
+            margin-bottom: 2mm;
             text-transform: uppercase;
+            padding: 2mm;
+            background: #000;
+            color: #fff;
           }
           .client {
-            font-size: 8px;
+            font-size: 11px;
+            font-weight: bold;
             text-align: center;
+            text-transform: uppercase;
           }
         </style>
       </head>
@@ -126,11 +134,7 @@ export function AccessoryLabels({ ticket, onPrint }: AccessoryLabelsProps) {
           <div key={index} className="label">
             <div className="ticket-id">{ticket.id}</div>
             <div className="accessory">{accessory}</div>
-            <div className="client">
-              {ticket.client_name.length > 20 
-                ? ticket.client_name.substring(0, 20) + '...' 
-                : ticket.client_name}
-            </div>
+            <div className="client">{ticket.client_name}</div>
           </div>
         ))}
       </div>
