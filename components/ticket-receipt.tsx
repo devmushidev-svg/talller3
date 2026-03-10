@@ -1,16 +1,114 @@
-'use client'
+"use client"
 
-import { Ticket, EQUIPMENT_LABELS } from '@/lib/types'
-import { QRCodeSVG } from 'qrcode.react'
+import { useRef } from "react"
+import { Ticket, ShopSettings, EQUIPMENT_LABELS } from "@/lib/types"
+import { Button } from "@/components/ui/button"
+import { Receipt } from "lucide-react"
+import { QRCodeSVG } from "qrcode.react"
 
 interface TicketReceiptProps {
   ticket: Ticket
-  shopName?: string
+  settings: ShopSettings
+  onPrint?: () => void
 }
 
-export function TicketReceipt({ ticket, shopName = 'TALLER DE REPARACIÓN' }: TicketReceiptProps) {
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleString('es-MX', {
+export function TicketReceipt({ ticket, settings, onPrint }: TicketReceiptProps) {
+  const printRef = useRef<HTMLDivElement>(null)
+
+  const handlePrint = () => {
+    const printContent = printRef.current
+    if (!printContent) return
+
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+
+    const width = settings.printer_width === '58mm' ? '48mm' : '72mm'
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Ticket POS - ${ticket.id}</title>
+        <style>
+          @page {
+            size: ${width} auto;
+            margin: 2mm;
+          }
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          body {
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            line-height: 1.3;
+            color: #000;
+            background: #fff;
+            width: ${width};
+          }
+          .receipt {
+            padding: 2mm;
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 4px;
+          }
+          .shop-name {
+            font-size: 14px;
+            font-weight: bold;
+          }
+          .divider {
+            border-top: 1px dashed #000;
+            margin: 4px 0;
+          }
+          .ticket-id {
+            text-align: center;
+            font-size: 12px;
+            font-weight: bold;
+          }
+          .row {
+            margin: 2px 0;
+          }
+          .label {
+            font-weight: bold;
+          }
+          .accessories {
+            margin-left: 8px;
+          }
+          .qr-section {
+            text-align: center;
+            margin: 8px 0;
+          }
+          .footer {
+            text-align: center;
+            font-size: 8px;
+            margin-top: 8px;
+          }
+        </style>
+      </head>
+      <body>
+        ${printContent.innerHTML}
+      </body>
+      </html>
+    `)
+    printWindow.document.close()
+    printWindow.focus()
+    setTimeout(() => {
+      printWindow.print()
+      printWindow.close()
+    }, 250)
+
+    onPrint?.()
+  }
+
+  const accessories = typeof ticket.accessories === 'string' 
+    ? JSON.parse(ticket.accessories) 
+    : ticket.accessories || []
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return ''
+    return new Date(dateStr).toLocaleString('es-HN', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -20,119 +118,94 @@ export function TicketReceipt({ ticket, shopName = 'TALLER DE REPARACIÓN' }: Ti
   }
 
   return (
-    <div className="receipt-ticket" style={{ fontFamily: "'Courier New', monospace" }}>
-      {/* Header */}
-      <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-        <h1 style={{ fontSize: '16px', fontWeight: 'bold', margin: 0 }}>{shopName}</h1>
-        <p style={{ fontSize: '10px', margin: '2px 0' }}>Sistema de Tickets de Taller</p>
-      </div>
+    <div className="space-y-4">
+      <Button onClick={handlePrint} variant="outline" className="w-full">
+        <Receipt className="mr-2 h-4 w-4" />
+        Imprimir Ticket POS ({settings.printer_width || '80mm'})
+      </Button>
 
-      {/* Divider */}
-      <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
+      <div ref={printRef} className="hidden">
+        <div className="receipt">
+          {/* Header */}
+          <div className="header">
+            <div className="shop-name">{settings.shop_name || 'MI TALLER'}</div>
+            {settings.shop_phone && <div>{settings.shop_phone}</div>}
+          </div>
 
-      {/* Ticket Info */}
-      <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-        <p style={{ fontSize: '12px', fontWeight: 'bold', margin: 0 }}>
-          TICKET: {ticket.id}
-        </p>
-        <p style={{ fontSize: '10px', margin: '2px 0' }}>
-          {formatDate(ticket.created_at)}
-        </p>
-      </div>
+          <div className="divider"></div>
 
-      {/* Divider */}
-      <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
+          {/* Ticket ID & Date */}
+          <div className="ticket-id">TICKET: {ticket.id}</div>
+          <div style={{ textAlign: 'center', fontSize: '9px' }}>
+            {formatDate(ticket.created_at)}
+          </div>
 
-      {/* Client Info */}
-      <div style={{ marginBottom: '8px' }}>
-        <p style={{ fontSize: '11px', margin: '2px 0' }}>
-          <strong>Cliente:</strong> {ticket.client_name}
-        </p>
-        <p style={{ fontSize: '11px', margin: '2px 0' }}>
-          <strong>Tel:</strong> {ticket.client_phone}
-        </p>
-        {ticket.client_email && (
-          <p style={{ fontSize: '11px', margin: '2px 0' }}>
-            <strong>Email:</strong> {ticket.client_email}
-          </p>
-        )}
-      </div>
+          <div className="divider"></div>
 
-      {/* Divider */}
-      <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
+          {/* Client Info */}
+          <div className="row"><span className="label">Cliente:</span> {ticket.client_name}</div>
+          <div className="row"><span className="label">Tel:</span> {ticket.client_phone}</div>
 
-      {/* Equipment Info */}
-      <div style={{ marginBottom: '8px' }}>
-        <p style={{ fontSize: '11px', margin: '2px 0' }}>
-          <strong>Equipo:</strong> {EQUIPMENT_LABELS[ticket.equipment_type]}
-        </p>
-        <p style={{ fontSize: '11px', margin: '2px 0' }}>
-          <strong>Marca:</strong> {ticket.brand}
-        </p>
-        <p style={{ fontSize: '11px', margin: '2px 0' }}>
-          <strong>Modelo:</strong> {ticket.model}
-        </p>
-        {ticket.serial_number && (
-          <p style={{ fontSize: '11px', margin: '2px 0' }}>
-            <strong>Serie:</strong> {ticket.serial_number}
-          </p>
-        )}
-      </div>
+          <div className="divider"></div>
 
-      {/* Divider */}
-      <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
+          {/* Equipment Info */}
+          <div className="row">
+            <span className="label">Equipo:</span> {EQUIPMENT_LABELS[ticket.equipment_type] || ticket.equipment_type}
+          </div>
+          {ticket.brand && <div className="row"><span className="label">Marca:</span> {ticket.brand}</div>}
+          {ticket.model && <div className="row"><span className="label">Modelo:</span> {ticket.model}</div>}
+          {ticket.serial_number && <div className="row"><span className="label">S/N:</span> {ticket.serial_number}</div>}
 
-      {/* Problem */}
-      <div style={{ marginBottom: '8px' }}>
-        <p style={{ fontSize: '11px', fontWeight: 'bold', margin: '2px 0' }}>
-          PROBLEMA REPORTADO:
-        </p>
-        <p style={{ fontSize: '10px', margin: '2px 0' }}>
-          {ticket.problem_description}
-        </p>
-      </div>
+          <div className="divider"></div>
 
-      {/* Divider */}
-      <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
+          {/* Problem */}
+          <div className="row"><span className="label">PROBLEMA:</span></div>
+          <div style={{ fontSize: '9px', marginLeft: '4px' }}>{ticket.problem_description}</div>
 
-      {/* Accessories */}
-      {ticket.accessories.length > 0 && (
-        <div style={{ marginBottom: '8px' }}>
-          <p style={{ fontSize: '11px', fontWeight: 'bold', margin: '2px 0' }}>
-            ACCESORIOS RECIBIDOS:
-          </p>
-          {ticket.accessories.map(acc => (
-            <p key={acc} style={{ fontSize: '10px', margin: '1px 0' }}>
-              {'✓'} {acc}
-            </p>
-          ))}
+          {/* Accessories */}
+          {accessories.length > 0 && (
+            <>
+              <div className="divider"></div>
+              <div className="row"><span className="label">ACCESORIOS:</span></div>
+              <div className="accessories">
+                {accessories.map((acc: string, i: number) => (
+                  <div key={i}>- {acc}</div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Estimated Delivery */}
+          {ticket.estimated_delivery_date && (
+            <>
+              <div className="divider"></div>
+              <div className="row">
+                <span className="label">Entrega Est.:</span> {new Date(ticket.estimated_delivery_date).toLocaleDateString('es-HN')}
+              </div>
+            </>
+          )}
+
+          {/* Diagnosis Cost */}
+          {ticket.diagnosis_cost > 0 && (
+            <div className="row">
+              <span className="label">Diagnóstico:</span> L. {ticket.diagnosis_cost.toFixed(2)}
+            </div>
+          )}
+
+          <div className="divider"></div>
+
+          {/* QR Code */}
+          <div className="qr-section">
+            <QRCodeSVG value={ticket.id} size={50} />
+            <div style={{ fontSize: '8px' }}>Escanear para estado</div>
+          </div>
+
+          {/* Footer */}
+          <div className="footer">
+            <div>Conserve este ticket</div>
+            <div>Gracias por su preferencia</div>
+          </div>
         </div>
-      )}
-
-      {/* Divider */}
-      <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
-
-      {/* QR Code */}
-      <div style={{ textAlign: 'center', marginTop: '8px', marginBottom: '8px' }}>
-        <QRCodeSVG 
-          value={`TICKET-${ticket.id}`}
-          size={64}
-          style={{ margin: '0 auto' }}
-        />
-        <p style={{ fontSize: '8px', marginTop: '4px' }}>
-          Escanee para consultar estado
-        </p>
-      </div>
-
-      {/* Footer */}
-      <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
-      <div style={{ textAlign: 'center' }}>
-        <p style={{ fontSize: '9px', margin: '2px 0' }}>
-          Conserve este ticket para recoger su equipo
-        </p>
-        <p style={{ fontSize: '9px', margin: '2px 0' }}>
-          Gracias por su preferencia
-        </p>
       </div>
     </div>
   )

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -21,12 +21,10 @@ import {
   EQUIPMENT_LABELS,
   ACCESSORY_OPTIONS,
 } from "@/lib/types"
-import { Save, Printer, Loader2, Calendar, DollarSign, FileText, Tag } from "lucide-react"
-import { TicketReceipt } from "@/components/ticket-receipt"
-import { AccessoryLabels } from "@/components/accessory-labels"
-import { DeviceLabel } from "@/components/device-label"
+import { Save, Printer, Loader2, Calendar, DollarSign, FileText } from "lucide-react"
 import { PhotoUpload } from "@/components/photo-upload"
 import { CustomerHistory } from "@/components/customer-history"
+import { PrintOptions } from "@/components/print-options"
 
 export default function NuevoTicketPage() {
   const [clientName, setClientName] = useState("")
@@ -46,17 +44,14 @@ export default function NuevoTicketPage() {
   const [tempTicketId] = useState(() => `TKT-${Date.now()}`)
   
   const [savedTicket, setSavedTicket] = useState<Ticket | null>(null)
-  const [showPrint, setShowPrint] = useState(false)
-  const [printType, setPrintType] = useState<'receipt' | 'device' | 'all'>('all')
+  const [showPrintDialog, setShowPrintDialog] = useState(false)
   const [saving, setSaving] = useState(false)
   const [customerExists, setCustomerExists] = useState(false)
-
-  const printRef = useRef<HTMLDivElement>(null)
 
   // Check if customer exists when phone changes
   useEffect(() => {
     const checkCustomer = async () => {
-      if (clientPhone.length >= 10) {
+      if (clientPhone.length >= 8) {
         try {
           const response = await fetch(`/api/customers?phone=${encodeURIComponent(clientPhone)}`)
           if (response.ok) {
@@ -81,7 +76,7 @@ export default function NuevoTicketPage() {
     
     const debounce = setTimeout(checkCustomer, 500)
     return () => clearTimeout(debounce)
-  }, [clientPhone])
+  }, [clientPhone, clientName])
 
   const handleAccessoryChange = (accessory: string, checked: boolean) => {
     if (checked) {
@@ -105,13 +100,13 @@ export default function NuevoTicketPage() {
     setInternalNotes("")
     setPhotos([])
     setSavedTicket(null)
-    setShowPrint(false)
+    setShowPrintDialog(false)
     setCustomerExists(false)
   }
 
-  const handleSave = async (shouldPrint: boolean = false, print: 'receipt' | 'device' | 'all' = 'all') => {
+  const handleSave = async (openPrintDialog: boolean = false) => {
     if (!clientName || !clientPhone || !problemDescription) {
-      alert("Por favor complete los campos obligatorios")
+      alert("Por favor complete los campos obligatorios: Nombre, Teléfono y Problema")
       return
     }
 
@@ -164,15 +159,8 @@ export default function NuevoTicketPage() {
 
       setSavedTicket(parsedTicket)
 
-      if (shouldPrint) {
-        setPrintType(print)
-        setShowPrint(true)
-        setTimeout(() => {
-          window.print()
-          setTimeout(() => {
-            resetForm()
-          }, 500)
-        }, 100)
+      if (openPrintDialog) {
+        setShowPrintDialog(true)
       } else {
         alert(`Ticket ${ticket.id} creado correctamente`)
         resetForm()
@@ -182,6 +170,14 @@ export default function NuevoTicketPage() {
       console.error(error)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handlePrintDialogClose = (open: boolean) => {
+    setShowPrintDialog(open)
+    if (!open && savedTicket) {
+      // Reset form when closing print dialog
+      resetForm()
     }
   }
 
@@ -218,7 +214,7 @@ export default function NuevoTicketPage() {
                     id="clientPhone"
                     value={clientPhone}
                     onChange={(e) => setClientPhone(e.target.value)}
-                    placeholder="555-123-4567"
+                    placeholder="9999-9999"
                     className="h-12 text-lg"
                     type="tel"
                   />
@@ -364,7 +360,7 @@ export default function NuevoTicketPage() {
                 <div className="space-y-2">
                   <Label htmlFor="diagnosisCost" className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4" />
-                    Costo de Diagnóstico
+                    Costo de Diagnóstico (L.)
                   </Label>
                   <Input
                     id="diagnosisCost"
@@ -382,13 +378,13 @@ export default function NuevoTicketPage() {
               <div className="space-y-2">
                 <Label htmlFor="internalNotes" className="flex items-center gap-2">
                   <FileText className="h-4 w-4" />
-                  Notas Internas (no se imprimen)
+                  Notas Internas (no se imprimen en ticket cliente)
                 </Label>
                 <Textarea
                   id="internalNotes"
                   value={internalNotes}
                   onChange={(e) => setInternalNotes(e.target.value)}
-                  placeholder="Notas para el técnico..."
+                  placeholder="Notas para el técnico, contraseñas, etc..."
                   className="min-h-20"
                 />
               </div>
@@ -396,7 +392,7 @@ export default function NuevoTicketPage() {
           </Card>
 
           {/* Action Buttons */}
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2">
             <Button
               onClick={() => handleSave(false)}
               size="lg"
@@ -412,35 +408,7 @@ export default function NuevoTicketPage() {
               Solo Guardar
             </Button>
             <Button
-              onClick={() => handleSave(true, 'receipt')}
-              size="lg"
-              variant="outline"
-              className="h-14 text-base"
-              disabled={saving}
-            >
-              {saving ? (
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              ) : (
-                <Printer className="mr-2 h-5 w-5" />
-              )}
-              + Ticket Cliente
-            </Button>
-            <Button
-              onClick={() => handleSave(true, 'device')}
-              size="lg"
-              variant="outline"
-              className="h-14 text-base"
-              disabled={saving}
-            >
-              {saving ? (
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              ) : (
-                <Tag className="mr-2 h-5 w-5" />
-              )}
-              + Etiquetas
-            </Button>
-            <Button
-              onClick={() => handleSave(true, 'all')}
+              onClick={() => handleSave(true)}
               size="lg"
               className="h-14 text-base"
               disabled={saving}
@@ -450,31 +418,19 @@ export default function NuevoTicketPage() {
               ) : (
                 <Printer className="mr-2 h-5 w-5" />
               )}
-              + Todo
+              Guardar e Imprimir
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Print area - only visible when printing */}
-      {showPrint && savedTicket && (
-        <div ref={printRef} className="print-only hidden print:block">
-          {(printType === 'receipt' || printType === 'all') && (
-            <TicketReceipt ticket={savedTicket} />
-          )}
-          {printType === 'all' && <div className="page-break" />}
-          {(printType === 'device' || printType === 'all') && (
-            <>
-              <DeviceLabel ticket={savedTicket} />
-              {savedTicket.accessories.length > 0 && (
-                <>
-                  <div className="page-break" />
-                  <AccessoryLabels ticket={savedTicket} />
-                </>
-              )}
-            </>
-          )}
-        </div>
+      {/* Print Dialog */}
+      {savedTicket && (
+        <PrintOptions 
+          ticket={savedTicket} 
+          open={showPrintDialog} 
+          onOpenChange={handlePrintDialogClose}
+        />
       )}
     </DashboardLayout>
   )
