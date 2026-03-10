@@ -30,11 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import {
   Ticket,
   TicketStatus,
@@ -55,10 +51,10 @@ import {
   Tag,
   Image as ImageIcon
 } from "lucide-react"
-import { TicketReceipt } from "@/components/ticket-receipt"
-import { DeviceLabel } from "@/components/device-label"
 import { QRScanner } from "@/components/qr-scanner"
 import { CustomerHistory } from "@/components/customer-history"
+import { PrintCustomer } from "@/components/print-customer"
+import { PrintInternal } from "@/components/print-internal"
 
 const statusOptions: TicketStatus[] = [
   "recibido",
@@ -73,8 +69,9 @@ export default function TicketsActivosPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
-  const [showPrint, setShowPrint] = useState(false)
-  const [printType, setPrintType] = useState<'receipt' | 'label'>('receipt')
+  const [printTicket, setPrintTicket] = useState<Ticket | null>(null)
+  const [showCustomerPrint, setShowCustomerPrint] = useState(false)
+  const [showInternalPrint, setShowInternalPrint] = useState(false)
   const [loading, setLoading] = useState(true)
   const [showFilters, setShowFilters] = useState(false)
   
@@ -217,14 +214,14 @@ export default function TicketsActivosPage() {
     setEditMode(false)
   }
 
-  const handlePrint = (ticket: Ticket, type: 'receipt' | 'label') => {
-    setSelectedTicket(ticket)
-    setPrintType(type)
-    setShowPrint(true)
-    setTimeout(() => {
-      window.print()
-      setShowPrint(false)
-    }, 100)
+  const handleCustomerPrint = (ticket: Ticket) => {
+    setPrintTicket(ticket)
+    setShowCustomerPrint(true)
+  }
+
+  const handleInternalPrint = (ticket: Ticket) => {
+    setPrintTicket(ticket)
+    setShowInternalPrint(true)
   }
 
   const handleQRScan = (ticketId: string) => {
@@ -451,23 +448,25 @@ export default function TicketsActivosPage() {
                             ) : '-'}
                           </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
-                            <div className="flex gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => openTicketDetail(ticket)}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handlePrint(ticket, 'receipt')}
-                              >
-                                <Printer className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
+                                            <div className="flex gap-1">
+                                              <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                title="Ver detalles"
+                                                onClick={() => openTicketDetail(ticket)}
+                                              >
+                                                <Eye className="h-4 w-4" />
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                title="Imprimir ticket cliente"
+                                                onClick={() => handleCustomerPrint(ticket)}
+                                              >
+                                                <Printer className="h-4 w-4" />
+                                              </Button>
+                                            </div>
+                                          </TableCell>
                         </TableRow>
                       ))
                     )}
@@ -714,7 +713,7 @@ export default function TicketsActivosPage() {
                 )}
 
                 {/* Actions */}
-                <div className="flex flex-wrap gap-3 border-t pt-4">
+                <div className="space-y-4 border-t pt-4">
                   <Select
                     value={selectedTicket.status}
                     onValueChange={(value) =>
@@ -732,14 +731,17 @@ export default function TicketsActivosPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button variant="outline" onClick={() => handlePrint(selectedTicket, 'receipt')}>
-                    <Printer className="mr-2 h-4 w-4" />
-                    Ticket
-                  </Button>
-                  <Button variant="outline" onClick={() => handlePrint(selectedTicket, 'label')}>
-                    <Tag className="mr-2 h-4 w-4" />
-                    Etiqueta
-                  </Button>
+                  
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Button onClick={() => handleCustomerPrint(selectedTicket)} className="h-12">
+                      <Printer className="mr-2 h-4 w-4" />
+                      Orden de Trabajo (Cliente)
+                    </Button>
+                    <Button variant="secondary" onClick={() => handleInternalPrint(selectedTicket)} className="h-12">
+                      <Tag className="mr-2 h-4 w-4" />
+                      POS / Etiquetas (Interno)
+                    </Button>
+                  </div>
                 </div>
               </div>
             </>
@@ -747,15 +749,20 @@ export default function TicketsActivosPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Print area */}
-      {showPrint && selectedTicket && (
-        <div className="print-only hidden print:block">
-          {printType === 'receipt' ? (
-            <TicketReceipt ticket={selectedTicket} />
-          ) : (
-            <DeviceLabel ticket={selectedTicket} />
-          )}
-        </div>
+      {/* Print Dialogs */}
+      {printTicket && (
+        <>
+          <PrintCustomer 
+            ticket={printTicket} 
+            open={showCustomerPrint} 
+            onOpenChange={setShowCustomerPrint}
+          />
+          <PrintInternal 
+            ticket={printTicket} 
+            open={showInternalPrint} 
+            onOpenChange={setShowInternalPrint}
+          />
+        </>
       )}
     </DashboardLayout>
   )
