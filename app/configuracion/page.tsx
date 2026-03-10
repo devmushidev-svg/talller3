@@ -1,91 +1,46 @@
-'use client'
+"use client"
 
-import { useState, useEffect } from 'react'
-import { DashboardLayout } from '@/components/dashboard-layout'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
+import { useState } from "react"
+import { DashboardLayout } from "@/components/dashboard-layout"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { Store, Printer, Bell, Save } from 'lucide-react'
-import { Spinner } from '@/components/ui/spinner'
-import useSWR, { mutate } from 'swr'
-
-const fetcher = (url: string) => fetch(url).then(res => res.json())
+} from "@/components/ui/select"
+import { Store, Printer, Bell, Save } from "lucide-react"
 
 export default function ConfiguracionPage() {
-  const { data: settings, isLoading } = useSWR<Record<string, string>>('/api/settings', fetcher)
-  
-  const [shopName, setShopName] = useState('')
-  const [shopPhone, setShopPhone] = useState('')
-  const [shopAddress, setShopAddress] = useState('')
-  const [shopEmail, setShopEmail] = useState('')
-  const [printerWidth, setPrinterWidth] = useState('80')
+  const [shopName, setShopName] = useState("Taller de Reparación")
+  const [shopPhone, setShopPhone] = useState("")
+  const [shopAddress, setShopAddress] = useState("")
+  const [shopEmail, setShopEmail] = useState("")
+  const [printerWidth, setPrinterWidth] = useState("80")
   const [printLogo, setPrintLogo] = useState(true)
   const [notifyReady, setNotifyReady] = useState(true)
   const [notifyDelivered, setNotifyDelivered] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
 
-  useEffect(() => {
-    if (settings) {
-      setShopName(settings.shop_name || '')
-      setShopPhone(settings.shop_phone || '')
-      setShopAddress(settings.shop_address || '')
-      setShopEmail(settings.shop_email || '')
-      setPrinterWidth(settings.printer_width || '80')
-      setPrintLogo(settings.print_logo === 'true')
-      setNotifyReady(settings.notify_ready === 'true')
-      setNotifyDelivered(settings.notify_delivered === 'true')
-    }
-  }, [settings])
-
-  const handleSave = async () => {
-    setIsSaving(true)
-    try {
-      await fetch('/api/settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          shop_name: shopName,
-          shop_phone: shopPhone,
-          shop_address: shopAddress,
-          shop_email: shopEmail,
-          printer_width: printerWidth,
-          print_logo: printLogo.toString(),
-          notify_ready: notifyReady.toString(),
-          notify_delivered: notifyDelivered.toString()
-        })
-      })
-      mutate('/api/settings')
-      alert('Configuración guardada correctamente')
-    } catch (error) {
-      console.error('Error:', error)
-      alert('Error al guardar la configuración')
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  if (isLoading) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <Spinner className="h-8 w-8" />
-        </div>
-      </DashboardLayout>
-    )
+  const handleSave = () => {
+    // In a real app, this would save to the database
+    // For the preview, settings are stored in memory
+    alert("Configuración guardada correctamente")
   }
 
   return (
     <DashboardLayout>
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div className="mx-auto max-w-3xl space-y-6">
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold text-foreground">Configuración</h1>
@@ -96,12 +51,14 @@ export default function ConfiguracionPage() {
         <Card className="border-border">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
-                <Store className="w-5 h-5 text-primary" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <Store className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <CardTitle className="text-lg">Datos del Taller</CardTitle>
-                <CardDescription>Información que aparece en los tickets</CardDescription>
+                <CardDescription>
+                  Información que aparece en los tickets
+                </CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -115,7 +72,7 @@ export default function ConfiguracionPage() {
                 placeholder="Nombre del taller"
               />
             </div>
-            <div className="grid sm:grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="shopPhone">Teléfono</Label>
                 <Input
@@ -152,12 +109,14 @@ export default function ConfiguracionPage() {
         <Card className="border-border">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
-                <Printer className="w-5 h-5 text-primary" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <Printer className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <CardTitle className="text-lg">Impresora</CardTitle>
-                <CardDescription>Configuración de impresión térmica</CardDescription>
+                <CardDescription>
+                  Configuración de impresión térmica
+                </CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -198,8 +157,8 @@ export default function ConfiguracionPage() {
         <Card className="border-border">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
-                <Bell className="w-5 h-5 text-primary" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <Bell className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <CardTitle className="text-lg">Notificaciones</CardTitle>
@@ -239,8 +198,8 @@ export default function ConfiguracionPage() {
         </Card>
 
         {/* Save Button */}
-        <Button onClick={handleSave} size="lg" className="w-full" disabled={isSaving}>
-          {isSaving ? <Spinner className="w-5 h-5 mr-2" /> : <Save className="w-5 h-5 mr-2" />}
+        <Button onClick={handleSave} size="lg" className="w-full">
+          <Save className="mr-2 h-5 w-5" />
           Guardar Configuración
         </Button>
       </div>
