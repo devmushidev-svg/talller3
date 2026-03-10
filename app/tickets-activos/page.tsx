@@ -448,25 +448,33 @@ export default function TicketsActivosPage() {
                             ) : '-'}
                           </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
-                                            <div className="flex gap-1">
-                                              <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                title="Ver detalles"
-                                                onClick={() => openTicketDetail(ticket)}
-                                              >
-                                                <Eye className="h-4 w-4" />
-                                              </Button>
-                                              <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                title="Imprimir ticket cliente"
-                                                onClick={() => handleCustomerPrint(ticket)}
-                                              >
-                                                <Printer className="h-4 w-4" />
-                                              </Button>
-                                            </div>
-                                          </TableCell>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Ver detalles"
+                                onClick={() => openTicketDetail(ticket)}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Imprimir ticket cliente"
+                                onClick={() => handleCustomerPrint(ticket)}
+                              >
+                                <Printer className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Etiquetas internas"
+                                onClick={() => handleInternalPrint(ticket)}
+                              >
+                                <Tag className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
                         </TableRow>
                       ))
                     )}
@@ -480,7 +488,7 @@ export default function TicketsActivosPage() {
 
       {/* Ticket Detail Dialog */}
       <Dialog
-        open={!!selectedTicket && !showPrint}
+        open={!!selectedTicket}
         onOpenChange={() => setSelectedTicket(null)}
       >
         <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">

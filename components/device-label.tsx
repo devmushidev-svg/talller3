@@ -1,10 +1,10 @@
 "use client"
 
-import { useRef } from "react"
+import { useRef, useEffect, useState } from "react"
 import { Ticket, ShopSettings } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Tag } from "lucide-react"
-import { QRCodeSVG } from "qrcode.react"
+import { QRCodeCanvas } from "qrcode.react"
 
 interface DeviceLabelProps {
   ticket: Ticket
@@ -14,6 +14,19 @@ interface DeviceLabelProps {
 
 export function DeviceLabel({ ticket, settings, onPrint }: DeviceLabelProps) {
   const printRef = useRef<HTMLDivElement>(null)
+  const qrRef = useRef<HTMLCanvasElement>(null)
+  const [qrDataUrl, setQrDataUrl] = useState<string>("")
+
+  useEffect(() => {
+    // Convert QR canvas to data URL after render
+    const timer = setTimeout(() => {
+      const canvas = document.querySelector(`#qr-canvas-${ticket.id.replace(/[^a-zA-Z0-9]/g, '')}`) as HTMLCanvasElement
+      if (canvas) {
+        setQrDataUrl(canvas.toDataURL('image/png'))
+      }
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [ticket.id])
 
   const handlePrint = () => {
     const printContent = printRef.current
@@ -136,12 +149,21 @@ export function DeviceLabel({ ticket, settings, onPrint }: DeviceLabelProps) {
         Imprimir Etiqueta Equipo
       </Button>
 
+      {/* Hidden QR Canvas for data URL generation */}
+      <div className="hidden">
+        <QRCodeCanvas 
+          id={`qr-canvas-${ticket.id.replace(/[^a-zA-Z0-9]/g, '')}`}
+          value={ticket.id} 
+          size={60} 
+        />
+      </div>
+
       <div ref={printRef} className="hidden">
         <div className="label">
-          <div className="header">{settings.shop_name || 'MI TALLER'}</div>
+          <div className="header">{settings.shop_name || 'MULTIPLANET'}</div>
           
           <div className="qr-section">
-            <QRCodeSVG value={ticket.id} size={50} />
+            {qrDataUrl && <img src={qrDataUrl} alt="QR" style={{ width: '50px', height: '50px', margin: '0 auto' }} />}
           </div>
           
           <div className="ticket-id">{ticket.id}</div>

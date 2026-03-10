@@ -1,10 +1,10 @@
 "use client"
 
-import { useRef } from "react"
+import { useRef, useEffect, useState } from "react"
 import { Ticket, ShopSettings, EQUIPMENT_LABELS } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Receipt } from "lucide-react"
-import { QRCodeSVG } from "qrcode.react"
+import { QRCodeCanvas } from "qrcode.react"
 
 interface TicketReceiptProps {
   ticket: Ticket
@@ -14,6 +14,17 @@ interface TicketReceiptProps {
 
 export function TicketReceipt({ ticket, settings, onPrint }: TicketReceiptProps) {
   const printRef = useRef<HTMLDivElement>(null)
+  const [qrDataUrl, setQrDataUrl] = useState<string>("")
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const canvas = document.querySelector(`#qr-receipt-${ticket.id.replace(/[^a-zA-Z0-9]/g, '')}`) as HTMLCanvasElement
+      if (canvas) {
+        setQrDataUrl(canvas.toDataURL('image/png'))
+      }
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [ticket.id])
 
   const handlePrint = () => {
     const printContent = printRef.current
@@ -142,6 +153,15 @@ export function TicketReceipt({ ticket, settings, onPrint }: TicketReceiptProps)
         Imprimir Ticket POS ({settings.printer_width || '80mm'})
       </Button>
 
+      {/* Hidden QR Canvas */}
+      <div className="hidden">
+        <QRCodeCanvas 
+          id={`qr-receipt-${ticket.id.replace(/[^a-zA-Z0-9]/g, '')}`}
+          value={ticket.id} 
+          size={60} 
+        />
+      </div>
+
       <div ref={printRef} className="hidden">
         <div className="receipt">
           {/* Header */}
@@ -214,7 +234,7 @@ export function TicketReceipt({ ticket, settings, onPrint }: TicketReceiptProps)
 
           {/* QR Code */}
           <div className="qr-section">
-            <QRCodeSVG value={ticket.id} size={50} />
+            {qrDataUrl && <img src={qrDataUrl} alt="QR" style={{ width: '50px', height: '50px', margin: '0 auto' }} />}
             <div style={{ fontSize: '8px' }}>Escanear para estado</div>
           </div>
 
