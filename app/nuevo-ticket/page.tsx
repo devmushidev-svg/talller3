@@ -24,7 +24,8 @@ import {
 import { Save, Printer, Loader2, Calendar, DollarSign, FileText } from "lucide-react"
 import { PhotoUpload } from "@/components/photo-upload"
 import { CustomerHistory } from "@/components/customer-history"
-import { PrintOptions } from "@/components/print-options"
+import { PrintCustomer } from "@/components/print-customer"
+import { PrintInternal } from "@/components/print-internal"
 
 export default function NuevoTicketPage() {
   const [clientName, setClientName] = useState("")
@@ -45,6 +46,7 @@ export default function NuevoTicketPage() {
   
   const [savedTicket, setSavedTicket] = useState<Ticket | null>(null)
   const [showPrintDialog, setShowPrintDialog] = useState(false)
+  const [showInternalPrint, setShowInternalPrint] = useState(false)
   const [saving, setSaving] = useState(false)
   const [customerExists, setCustomerExists] = useState(false)
 
@@ -101,6 +103,7 @@ export default function NuevoTicketPage() {
     setPhotos([])
     setSavedTicket(null)
     setShowPrintDialog(false)
+    setShowInternalPrint(false)
     setCustomerExists(false)
   }
 
@@ -171,11 +174,6 @@ export default function NuevoTicketPage() {
     } finally {
       setSaving(false)
     }
-  }
-
-  const handlePrintDialogClose = (open: boolean) => {
-    setShowPrintDialog(open)
-    // No reset form here - user can close and reopen or create new ticket manually
   }
 
   const handleNewTicket = () => {
@@ -426,30 +424,54 @@ export default function NuevoTicketPage() {
           ) : (
             <Card className="border-green-500 bg-green-50 dark:bg-green-950">
               <CardContent className="pt-6">
-                <div className="text-center space-y-4">
+                <div className="space-y-6">
                   <div className="flex items-center justify-center gap-2 text-green-700 dark:text-green-400">
                     <Save className="h-6 w-6" />
                     <span className="text-lg font-semibold">Ticket {savedTicket.id} guardado</span>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  
+                  {/* Ticket Cliente - Impresora Normal */}
+                  <div className="p-4 bg-background rounded-lg border-2 border-primary">
+                    <div className="text-center mb-3">
+                      <h3 className="font-semibold text-foreground">Para el Cliente</h3>
+                      <p className="text-sm text-muted-foreground">Impresora normal - Media carta</p>
+                    </div>
                     <Button
                       onClick={() => setShowPrintDialog(true)}
                       size="lg"
-                      className="h-14 text-base"
-                    >
-                      <Printer className="mr-2 h-5 w-5" />
-                      Imprimir Ticket
-                    </Button>
-                    <Button
-                      onClick={handleNewTicket}
-                      size="lg"
-                      variant="outline"
-                      className="h-14 text-base"
+                      className="w-full h-14 text-base bg-primary hover:bg-primary/90"
                     >
                       <FileText className="mr-2 h-5 w-5" />
-                      Nuevo Ticket
+                      Imprimir Orden de Trabajo
                     </Button>
                   </div>
+
+                  {/* Uso Interno - POS y Etiquetas */}
+                  <div className="p-4 bg-background rounded-lg border">
+                    <div className="text-center mb-3">
+                      <h3 className="font-semibold text-foreground">Uso Interno del Taller</h3>
+                      <p className="text-sm text-muted-foreground">Impresora POS y etiquetas</p>
+                    </div>
+                    <Button
+                      onClick={() => setShowInternalPrint(true)}
+                      size="lg"
+                      variant="secondary"
+                      className="w-full h-14 text-base"
+                    >
+                      <Printer className="mr-2 h-5 w-5" />
+                      Imprimir POS / Etiquetas
+                    </Button>
+                  </div>
+
+                  {/* Nuevo Ticket */}
+                  <Button
+                    onClick={handleNewTicket}
+                    size="lg"
+                    variant="outline"
+                    className="w-full h-12 text-base"
+                  >
+                    Crear Nuevo Ticket
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -457,13 +479,20 @@ export default function NuevoTicketPage() {
         </div>
       </div>
 
-      {/* Print Dialog */}
+      {/* Print Dialogs */}
       {savedTicket && (
-        <PrintOptions 
-          ticket={savedTicket} 
-          open={showPrintDialog} 
-          onOpenChange={handlePrintDialogClose}
-        />
+        <>
+          <PrintCustomer 
+            ticket={savedTicket} 
+            open={showPrintDialog} 
+            onOpenChange={setShowPrintDialog}
+          />
+          <PrintInternal 
+            ticket={savedTicket} 
+            open={showInternalPrint} 
+            onOpenChange={setShowInternalPrint}
+          />
+        </>
       )}
     </DashboardLayout>
   )
