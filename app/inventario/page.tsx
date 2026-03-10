@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Table,
   TableBody,
@@ -39,32 +40,39 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Part, PART_CATEGORIES } from "@/lib/types"
-import { Search, Plus, Pencil, Trash2, AlertTriangle, Loader2 } from "lucide-react"
+import { 
+  Part, 
+  PartCondition,
+  PART_CATEGORIES, 
+  PART_CONDITION_LABELS,
+  PART_CONDITION_COLORS 
+} from "@/lib/types"
+import { Search, Plus, Pencil, Trash2, Loader2, Package } from "lucide-react"
 
 interface PartFormData {
   name: string
+  model: string
+  size: string
   category: string
+  condition: PartCondition
+  notes: string
   quantity: number
-  min_stock: number
-  cost_price: number
-  sell_price: number
-  supplier: string
 }
 
 const emptyPart: PartFormData = {
   name: "",
+  model: "",
+  size: "",
   category: "",
-  quantity: 0,
-  min_stock: 5,
-  cost_price: 0,
-  sell_price: 0,
-  supplier: "",
+  condition: "bueno",
+  notes: "",
+  quantity: 1,
 }
 
 export default function InventarioPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
+  const [conditionFilter, setConditionFilter] = useState("all")
   const [parts, setParts] = useState<Part[]>([])
   const [loading, setLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -90,24 +98,25 @@ export default function InventarioPage() {
   }, [])
 
   const filteredParts = parts.filter((part) => {
-    const matchesSearch = part.name.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch = 
+      part.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (part.model && part.model.toLowerCase().includes(searchTerm.toLowerCase()))
     const matchesCategory = categoryFilter === "all" || part.category === categoryFilter
-    return matchesSearch && matchesCategory
+    const matchesCondition = conditionFilter === "all" || part.condition === conditionFilter
+    return matchesSearch && matchesCategory && matchesCondition
   })
-
-  const lowStockParts = parts.filter((p) => p.quantity <= p.min_stock)
 
   const handleOpenDialog = (part?: Part) => {
     if (part) {
       setEditingPart(part)
       setFormData({
         name: part.name,
+        model: part.model || "",
+        size: part.size || "",
         category: part.category,
+        condition: part.condition || "bueno",
+        notes: part.notes || "",
         quantity: part.quantity,
-        min_stock: part.min_stock,
-        cost_price: part.cost_price,
-        sell_price: part.sell_price,
-        supplier: part.supplier || "",
       })
     } else {
       setEditingPart(null)
@@ -160,13 +169,6 @@ export default function InventarioPage() {
     }
   }
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("es-MX", {
-      style: "currency",
-      currency: "MXN",
-    }).format(value)
-  }
-
   if (loading) {
     return (
       <DashboardLayout>
@@ -187,53 +189,55 @@ export default function InventarioPage() {
               Inventario de Piezas
             </h1>
             <p className="text-muted-foreground">
-              {parts.length} piezas registradas
+              {parts.length} piezas almacenadas
             </p>
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Buscar piezas..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-full sm:w-40">
-                <SelectValue placeholder="Categoría" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                {PART_CATEGORIES.map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    {cat}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button onClick={() => handleOpenDialog()}>
-              <Plus className="mr-2 h-4 w-4" />
-              Agregar Pieza
-            </Button>
-          </div>
+          <Button onClick={() => handleOpenDialog()} size="lg">
+            <Plus className="mr-2 h-4 w-4" />
+            Agregar Pieza
+          </Button>
         </div>
 
-        {/* Low Stock Alert */}
-        {lowStockParts.length > 0 && (
-          <Card className="border-warning bg-warning/10">
-            <CardContent className="flex items-center gap-3 py-4">
-              <AlertTriangle className="h-5 w-5 text-warning" />
-              <div>
-                <p className="font-medium text-warning-foreground">Stock Bajo</p>
-                <p className="text-sm text-muted-foreground">
-                  {lowStockParts.map((p) => p.name).join(", ")}
-                </p>
+        {/* Filters */}
+        <Card>
+          <CardContent className="py-4">
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nombre o modelo..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
               </div>
-            </CardContent>
-          </Card>
-        )}
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-full sm:w-44">
+                  <SelectValue placeholder="Categoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las categorías</SelectItem>
+                  {PART_CATEGORIES.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={conditionFilter} onValueChange={setConditionFilter}>
+                <SelectTrigger className="w-full sm:w-36">
+                  <SelectValue placeholder="Estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="bueno">Bueno</SelectItem>
+                  <SelectItem value="medio">Regular</SelectItem>
+                  <SelectItem value="malo">Malo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Table */}
         <Card className="border-border">
@@ -243,13 +247,11 @@ export default function InventarioPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nombre</TableHead>
+                    <TableHead className="hidden md:table-cell">Modelo</TableHead>
+                    <TableHead className="hidden lg:table-cell">Tamaño</TableHead>
                     <TableHead className="hidden sm:table-cell">Categoría</TableHead>
-                    <TableHead className="text-center">Stock</TableHead>
-                    <TableHead className="hidden text-center lg:table-cell">
-                      Mín.
-                    </TableHead>
-                    <TableHead className="text-right">Precio Venta</TableHead>
-                    <TableHead className="hidden xl:table-cell">Proveedor</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-center">Cant.</TableHead>
                     <TableHead className="w-24">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -258,9 +260,21 @@ export default function InventarioPage() {
                     <TableRow>
                       <TableCell
                         colSpan={7}
-                        className="py-8 text-center text-muted-foreground"
+                        className="py-12 text-center"
                       >
-                        No se encontraron piezas
+                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                          <Package className="h-10 w-10" />
+                          <p>No se encontraron piezas</p>
+                          {parts.length === 0 && (
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleOpenDialog()}
+                            >
+                              Agregar primera pieza
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -272,31 +286,31 @@ export default function InventarioPage() {
                             <p className="text-sm text-muted-foreground sm:hidden">
                               {part.category}
                             </p>
+                            {part.notes && (
+                              <p className="text-xs text-muted-foreground line-clamp-1">
+                                {part.notes}
+                              </p>
+                            )}
                           </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {part.model || "-"}
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          {part.size || "-"}
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">
                           {part.category}
                         </TableCell>
-                        <TableCell className="text-center">
-                          <Badge
-                            variant={
-                              part.quantity <= part.min_stock
-                                ? "destructive"
-                                : "secondary"
-                            }
-                            className="font-mono"
-                          >
-                            {part.quantity}
+                        <TableCell>
+                          <Badge className={PART_CONDITION_COLORS[part.condition as PartCondition] || PART_CONDITION_COLORS.bueno}>
+                            {PART_CONDITION_LABELS[part.condition as PartCondition] || 'Bueno'}
                           </Badge>
                         </TableCell>
-                        <TableCell className="hidden text-center text-muted-foreground lg:table-cell">
-                          {part.min_stock}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {formatCurrency(part.sell_price)}
-                        </TableCell>
-                        <TableCell className="hidden text-muted-foreground xl:table-cell">
-                          {part.supplier || "-"}
+                        <TableCell className="text-center">
+                          <Badge variant="secondary" className="font-mono">
+                            {part.quantity}
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
@@ -336,18 +350,44 @@ export default function InventarioPage() {
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Nombre *</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+                placeholder="Ej: Pantalla LCD"
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Nombre *</Label>
+                <Label htmlFor="model">Modelo</Label>
                 <Input
-                  id="name"
-                  value={formData.name}
+                  id="model"
+                  value={formData.model}
                   onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
+                    setFormData({ ...formData, model: e.target.value })
                   }
-                  placeholder="Nombre de la pieza"
+                  placeholder="Ej: LP156WH4"
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="size">Tamaño</Label>
+                <Input
+                  id="size"
+                  value={formData.size}
+                  onChange={(e) =>
+                    setFormData({ ...formData, size: e.target.value })
+                  }
+                  placeholder="Ej: 15.6 pulgadas"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="category">Categoría *</Label>
                 <Select
@@ -366,85 +406,50 @@ export default function InventarioPage() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="quantity">Cantidad</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  min="0"
-                  value={formData.quantity}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      quantity: parseInt(e.target.value) || 0,
-                    })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="min_stock">Stock Mínimo</Label>
-                <Input
-                  id="min_stock"
-                  type="number"
-                  min="0"
-                  value={formData.min_stock}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      min_stock: parseInt(e.target.value) || 0,
-                    })
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="cost_price">Precio Costo (MXN)</Label>
-                <Input
-                  id="cost_price"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.cost_price}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      cost_price: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="sell_price">Precio Venta (MXN)</Label>
-                <Input
-                  id="sell_price"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.sell_price}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      sell_price: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                />
+                <Label htmlFor="condition">Estado *</Label>
+                <Select
+                  value={formData.condition}
+                  onValueChange={(v) => setFormData({ ...formData, condition: v as PartCondition })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bueno">Bueno</SelectItem>
+                    <SelectItem value="medio">Regular</SelectItem>
+                    <SelectItem value="malo">Malo</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="supplier">Proveedor</Label>
+              <Label htmlFor="quantity">Cantidad</Label>
               <Input
-                id="supplier"
-                value={formData.supplier}
+                id="quantity"
+                type="number"
+                min="1"
+                value={formData.quantity}
                 onChange={(e) =>
-                  setFormData({ ...formData, supplier: e.target.value })
+                  setFormData({
+                    ...formData,
+                    quantity: parseInt(e.target.value) || 1,
+                  })
                 }
-                placeholder="Nombre del proveedor"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notas</Label>
+              <Textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) =>
+                  setFormData({ ...formData, notes: e.target.value })
+                }
+                placeholder="Notas adicionales sobre la pieza..."
+                rows={3}
               />
             </div>
           </div>

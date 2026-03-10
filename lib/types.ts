@@ -48,17 +48,31 @@ export interface Customer {
   updated_at?: string
 }
 
+export type PartCondition = 'bueno' | 'medio' | 'malo'
+
 export interface Part {
   id: string
   name: string
+  model?: string | null
+  size?: string | null
   category: string
+  condition: PartCondition
+  notes?: string | null
   quantity: number
-  min_stock: number
-  cost_price: number
-  sell_price: number
-  supplier?: string | null
   created_at?: string
   updated_at?: string
+}
+
+export const PART_CONDITION_LABELS: Record<PartCondition, string> = {
+  bueno: 'Bueno',
+  medio: 'Regular',
+  malo: 'Malo'
+}
+
+export const PART_CONDITION_COLORS: Record<PartCondition, string> = {
+  bueno: 'bg-success text-success-foreground',
+  medio: 'bg-warning text-warning-foreground',
+  malo: 'bg-destructive text-destructive-foreground'
 }
 
 export interface ShopSettings {
@@ -121,16 +135,18 @@ export const ACCESSORY_OPTIONS = [
 ]
 
 export const PART_CATEGORIES = [
-  'Tóners',
-  'Cartuchos',
-  'Fusores',
-  'Rodillos',
-  'Memorias RAM',
-  'Discos Duros',
-  'Fuentes de Poder',
   'Pantallas',
   'Teclados',
   'Baterías',
+  'Memorias RAM',
+  'Discos Duros',
+  'Fuentes de Poder',
+  'Placas Madre',
+  'Procesadores',
+  'Tarjetas Gráficas',
+  'Carcasas',
+  'Bisagras',
+  'Ventiladores',
   'Cables',
   'Otros'
 ]
