@@ -19,12 +19,25 @@ export function TicketReceipt({ ticket, settings, onPrint }: TicketReceiptProps)
     const printContent = printRef.current
     if (!printContent) return
 
-    const printWindow = window.open('', '_blank')
-    if (!printWindow) return
-
     const width = settings.printer_width === '58mm' ? '48mm' : '72mm'
 
-    printWindow.document.write(`
+    const iframe = document.createElement('iframe')
+    iframe.style.position = 'fixed'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = 'none'
+    document.body.appendChild(iframe)
+
+    const doc = iframe.contentDocument || iframe.contentWindow?.document
+    if (!doc) {
+      document.body.removeChild(iframe)
+      return
+    }
+
+    doc.open()
+    doc.write(`
       <!DOCTYPE html>
       <html>
       <head>
@@ -92,12 +105,17 @@ export function TicketReceipt({ ticket, settings, onPrint }: TicketReceiptProps)
       </body>
       </html>
     `)
-    printWindow.document.close()
-    printWindow.focus()
-    setTimeout(() => {
-      printWindow.print()
-      printWindow.close()
-    }, 250)
+    doc.close()
+
+    iframe.onload = () => {
+      setTimeout(() => {
+        iframe.contentWindow?.focus()
+        iframe.contentWindow?.print()
+        setTimeout(() => {
+          document.body.removeChild(iframe)
+        }, 100)
+      }, 100)
+    }
 
     onPrint?.()
   }

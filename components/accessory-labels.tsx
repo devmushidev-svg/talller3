@@ -23,10 +23,23 @@ export function AccessoryLabels({ ticket, onPrint }: AccessoryLabelsProps) {
     const printContent = printRef.current
     if (!printContent) return
 
-    const printWindow = window.open('', '_blank')
-    if (!printWindow) return
+    const iframe = document.createElement('iframe')
+    iframe.style.position = 'fixed'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = 'none'
+    document.body.appendChild(iframe)
 
-    printWindow.document.write(`
+    const doc = iframe.contentDocument || iframe.contentWindow?.document
+    if (!doc) {
+      document.body.removeChild(iframe)
+      return
+    }
+
+    doc.open()
+    doc.write(`
       <!DOCTYPE html>
       <html>
       <head>
@@ -80,12 +93,17 @@ export function AccessoryLabels({ ticket, onPrint }: AccessoryLabelsProps) {
       </body>
       </html>
     `)
-    printWindow.document.close()
-    printWindow.focus()
-    setTimeout(() => {
-      printWindow.print()
-      printWindow.close()
-    }, 250)
+    doc.close()
+
+    iframe.onload = () => {
+      setTimeout(() => {
+        iframe.contentWindow?.focus()
+        iframe.contentWindow?.print()
+        setTimeout(() => {
+          document.body.removeChild(iframe)
+        }, 100)
+      }, 100)
+    }
 
     onPrint?.()
   }
