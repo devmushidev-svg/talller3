@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -21,9 +21,12 @@ import {
   EQUIPMENT_LABELS,
   ACCESSORY_OPTIONS,
 } from "@/lib/types"
-import { Save, Printer, Loader2 } from "lucide-react"
+import { Save, Printer, Loader2, Calendar, DollarSign, FileText, Tag } from "lucide-react"
 import { TicketReceipt } from "@/components/ticket-receipt"
 import { AccessoryLabels } from "@/components/accessory-labels"
+import { DeviceLabel } from "@/components/device-label"
+import { PhotoUpload } from "@/components/photo-upload"
+import { CustomerHistory } from "@/components/customer-history"
 
 export default function NuevoTicketPage() {
   const [clientName, setClientName] = useState("")
@@ -34,11 +37,51 @@ export default function NuevoTicketPage() {
   const [serialNumber, setSerialNumber] = useState("")
   const [problemDescription, setProblemDescription] = useState("")
   const [accessories, setAccessories] = useState<string[]>([])
+  
+  // New fields
+  const [estimatedDeliveryDate, setEstimatedDeliveryDate] = useState("")
+  const [diagnosisCost, setDiagnosisCost] = useState("")
+  const [internalNotes, setInternalNotes] = useState("")
+  const [photos, setPhotos] = useState<string[]>([])
+  const [tempTicketId] = useState(() => `TKT-${Date.now()}`)
+  
   const [savedTicket, setSavedTicket] = useState<Ticket | null>(null)
   const [showPrint, setShowPrint] = useState(false)
+  const [printType, setPrintType] = useState<'receipt' | 'device' | 'all'>('all')
   const [saving, setSaving] = useState(false)
+  const [customerExists, setCustomerExists] = useState(false)
 
   const printRef = useRef<HTMLDivElement>(null)
+
+  // Check if customer exists when phone changes
+  useEffect(() => {
+    const checkCustomer = async () => {
+      if (clientPhone.length >= 10) {
+        try {
+          const response = await fetch(`/api/customers?phone=${encodeURIComponent(clientPhone)}`)
+          if (response.ok) {
+            const customers = await response.json()
+            if (customers.length > 0) {
+              setCustomerExists(true)
+              // Auto-fill name if empty
+              if (!clientName && customers[0].name) {
+                setClientName(customers[0].name)
+              }
+            } else {
+              setCustomerExists(false)
+            }
+          }
+        } catch (error) {
+          console.error('Error checking customer:', error)
+        }
+      } else {
+        setCustomerExists(false)
+      }
+    }
+    
+    const debounce = setTimeout(checkCustomer, 500)
+    return () => clearTimeout(debounce)
+  }, [clientPhone])
 
   const handleAccessoryChange = (accessory: string, checked: boolean) => {
     if (checked) {
@@ -57,11 +100,16 @@ export default function NuevoTicketPage() {
     setSerialNumber("")
     setProblemDescription("")
     setAccessories([])
+    setEstimatedDeliveryDate("")
+    setDiagnosisCost("")
+    setInternalNotes("")
+    setPhotos([])
     setSavedTicket(null)
     setShowPrint(false)
+    setCustomerExists(false)
   }
 
-  const handleSave = async (shouldPrint: boolean = false) => {
+  const handleSave = async (shouldPrint: boolean = false, print: 'receipt' | 'device' | 'all' = 'all') => {
     if (!clientName || !clientPhone || !problemDescription) {
       alert("Por favor complete los campos obligatorios")
       return
@@ -70,6 +118,17 @@ export default function NuevoTicketPage() {
     setSaving(true)
 
     try {
+      // Save or update customer
+      await fetch("/api/customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: clientName,
+          phone: clientPhone,
+        }),
+      })
+
+      // Create ticket
       const response = await fetch("/api/tickets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -82,6 +141,10 @@ export default function NuevoTicketPage() {
           serial_number: serialNumber || null,
           problem_description: problemDescription,
           accessories,
+          estimated_delivery_date: estimatedDeliveryDate || null,
+          diagnosis_cost: parseFloat(diagnosisCost) || 0,
+          internal_notes: internalNotes || null,
+          photos,
         }),
       })
 
@@ -89,17 +152,20 @@ export default function NuevoTicketPage() {
 
       const ticket = await response.json()
       
-      // Parse accessories back to array if it's a string
       const parsedTicket: Ticket = {
         ...ticket,
         accessories: typeof ticket.accessories === "string" 
           ? JSON.parse(ticket.accessories) 
           : ticket.accessories || [],
+        photos: typeof ticket.photos === "string"
+          ? JSON.parse(ticket.photos)
+          : ticket.photos || [],
       }
 
       setSavedTicket(parsedTicket)
 
       if (shouldPrint) {
+        setPrintType(print)
         setShowPrint(true)
         setTimeout(() => {
           window.print()
@@ -133,29 +199,39 @@ export default function NuevoTicketPage() {
             <CardHeader className="pb-4">
               <CardTitle className="text-lg">Datos del Cliente</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="clientName">Nombre del Cliente *</Label>
-                <Input
-                  id="clientName"
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                  placeholder="Nombre completo"
-                  className="h-12 text-lg"
-                  autoFocus
-                />
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="clientName">Nombre del Cliente *</Label>
+                  <Input
+                    id="clientName"
+                    value={clientName}
+                    onChange={(e) => setClientName(e.target.value)}
+                    placeholder="Nombre completo"
+                    className="h-12 text-lg"
+                    autoFocus
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="clientPhone">Teléfono *</Label>
+                  <Input
+                    id="clientPhone"
+                    value={clientPhone}
+                    onChange={(e) => setClientPhone(e.target.value)}
+                    placeholder="555-123-4567"
+                    className="h-12 text-lg"
+                    type="tel"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="clientPhone">Teléfono *</Label>
-                <Input
-                  id="clientPhone"
-                  value={clientPhone}
-                  onChange={(e) => setClientPhone(e.target.value)}
-                  placeholder="555-123-4567"
-                  className="h-12 text-lg"
-                  type="tel"
-                />
-              </div>
+              
+              {/* Customer history button */}
+              {customerExists && clientPhone && (
+                <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                  <span className="text-sm text-muted-foreground">Cliente existente</span>
+                  <CustomerHistory phone={clientPhone} name={clientName} />
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -228,6 +304,14 @@ export default function NuevoTicketPage() {
                   className="min-h-24 text-base"
                 />
               </div>
+
+              {/* Photo Upload */}
+              <PhotoUpload
+                ticketId={tempTicketId}
+                photos={photos}
+                onPhotosChange={setPhotos}
+                maxPhotos={5}
+              />
             </CardContent>
           </Card>
 
@@ -256,13 +340,68 @@ export default function NuevoTicketPage() {
             </CardContent>
           </Card>
 
+          {/* Additional Info */}
+          <Card className="border-border">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg">Información Adicional</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="estimatedDelivery" className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Fecha Estimada de Entrega
+                  </Label>
+                  <Input
+                    id="estimatedDelivery"
+                    type="date"
+                    value={estimatedDeliveryDate}
+                    onChange={(e) => setEstimatedDeliveryDate(e.target.value)}
+                    className="h-12"
+                    min={new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="diagnosisCost" className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Costo de Diagnóstico
+                  </Label>
+                  <Input
+                    id="diagnosisCost"
+                    type="number"
+                    value={diagnosisCost}
+                    onChange={(e) => setDiagnosisCost(e.target.value)}
+                    placeholder="0.00"
+                    className="h-12"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="internalNotes" className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Notas Internas (no se imprimen)
+                </Label>
+                <Textarea
+                  id="internalNotes"
+                  value={internalNotes}
+                  onChange={(e) => setInternalNotes(e.target.value)}
+                  placeholder="Notas para el técnico..."
+                  className="min-h-20"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Action Buttons */}
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Button
               onClick={() => handleSave(false)}
               size="lg"
               variant="secondary"
-              className="h-14 flex-1 text-lg"
+              className="h-14 text-base"
               disabled={saving}
             >
               {saving ? (
@@ -270,12 +409,13 @@ export default function NuevoTicketPage() {
               ) : (
                 <Save className="mr-2 h-5 w-5" />
               )}
-              Guardar Ticket
+              Solo Guardar
             </Button>
             <Button
-              onClick={() => handleSave(true)}
+              onClick={() => handleSave(true, 'receipt')}
               size="lg"
-              className="h-14 flex-1 text-lg"
+              variant="outline"
+              className="h-14 text-base"
               disabled={saving}
             >
               {saving ? (
@@ -283,7 +423,34 @@ export default function NuevoTicketPage() {
               ) : (
                 <Printer className="mr-2 h-5 w-5" />
               )}
-              Guardar e Imprimir Ticket
+              + Ticket Cliente
+            </Button>
+            <Button
+              onClick={() => handleSave(true, 'device')}
+              size="lg"
+              variant="outline"
+              className="h-14 text-base"
+              disabled={saving}
+            >
+              {saving ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <Tag className="mr-2 h-5 w-5" />
+              )}
+              + Etiquetas
+            </Button>
+            <Button
+              onClick={() => handleSave(true, 'all')}
+              size="lg"
+              className="h-14 text-base"
+              disabled={saving}
+            >
+              {saving ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <Printer className="mr-2 h-5 w-5" />
+              )}
+              + Todo
             </Button>
           </div>
         </div>
@@ -292,9 +459,21 @@ export default function NuevoTicketPage() {
       {/* Print area - only visible when printing */}
       {showPrint && savedTicket && (
         <div ref={printRef} className="print-only hidden print:block">
-          <TicketReceipt ticket={savedTicket} />
-          <div className="page-break" />
-          <AccessoryLabels ticket={savedTicket} />
+          {(printType === 'receipt' || printType === 'all') && (
+            <TicketReceipt ticket={savedTicket} />
+          )}
+          {printType === 'all' && <div className="page-break" />}
+          {(printType === 'device' || printType === 'all') && (
+            <>
+              <DeviceLabel ticket={savedTicket} />
+              {savedTicket.accessories.length > 0 && (
+                <>
+                  <div className="page-break" />
+                  <AccessoryLabels ticket={savedTicket} />
+                </>
+              )}
+            </>
+          )}
         </div>
       )}
     </DashboardLayout>

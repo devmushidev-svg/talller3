@@ -35,6 +35,10 @@ export async function POST(request: Request) {
       problem_description: body.problem_description,
       accessories: JSON.stringify(body.accessories || []),
       status: "recibido",
+      estimated_delivery_date: body.estimated_delivery_date || null,
+      diagnosis_cost: body.diagnosis_cost || 0,
+      internal_notes: body.internal_notes || null,
+      photos: JSON.stringify(body.photos || []),
     })
     .select()
     .single()
