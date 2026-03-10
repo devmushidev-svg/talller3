@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDb, generateId } from '@/lib/db'
+import { getDb, queryAll, queryOne, runQuery, generateId } from '@/lib/db'
 
 export async function GET(request: NextRequest) {
   try {
-    const db = getDb()
+    const db = await getDb()
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const search = searchParams.get('search')
@@ -40,11 +40,10 @@ export async function GET(request: NextRequest) {
     
     query += ' ORDER BY created_at DESC'
     
-    const stmt = db.prepare(query)
-    const tickets = stmt.all(...params)
+    const tickets = queryAll(db, query, params)
     
     // Parse accessories JSON
-    const parsedTickets = tickets.map((ticket: Record<string, unknown>) => ({
+    const parsedTickets = tickets.map((ticket) => ({
       ...ticket,
       accessories: ticket.accessories ? JSON.parse(ticket.accessories as string) : []
     }))
@@ -58,21 +57,19 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const db = getDb()
+    const db = await getDb()
     const data = await request.json()
     
     const id = generateId()
     const now = new Date().toISOString()
     
-    const stmt = db.prepare(`
+    runQuery(db, `
       INSERT INTO tickets (
         id, created_at, updated_at, client_name, client_phone, client_email,
         equipment_type, brand, model, serial_number, reported_issue,
         diagnosis, solution, status, estimated_cost, final_cost, accessories, notes
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `)
-    
-    stmt.run(
+    `, [
       id,
       now,
       now,
@@ -91,13 +88,13 @@ export async function POST(request: NextRequest) {
       data.finalCost || null,
       JSON.stringify(data.accessories || []),
       data.notes || null
-    )
+    ])
     
-    const newTicket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(id) as Record<string, unknown>
+    const newTicket = queryOne(db, 'SELECT * FROM tickets WHERE id = ?', [id])
     
     return NextResponse.json({
       ...newTicket,
-      accessories: newTicket.accessories ? JSON.parse(newTicket.accessories as string) : []
+      accessories: newTicket?.accessories ? JSON.parse(newTicket.accessories as string) : []
     }, { status: 201 })
   } catch (error) {
     console.error('Error creating ticket:', error)
