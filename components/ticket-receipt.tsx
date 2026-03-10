@@ -88,7 +88,7 @@ export function TicketReceipt({ ticket, shopName = 'TALLER DE REPARACIÓN' }: Ti
           PROBLEMA REPORTADO:
         </p>
         <p style={{ fontSize: '10px', margin: '2px 0' }}>
-          {ticket.reported_issue}
+          {ticket.problem_description}
         </p>
       </div>
 

@@ -11,54 +11,45 @@ export interface Ticket {
   id: string
   created_at: string
   updated_at: string
+  delivered_at?: string | null
   client_name: string
   client_phone: string
-  client_email?: string | null
   equipment_type: EquipmentType
-  brand: string
-  model: string
+  brand?: string | null
+  model?: string | null
   serial_number?: string | null
-  reported_issue: string
+  problem_description: string
   diagnosis?: string | null
-  solution?: string | null
+  repair_notes?: string | null
+  parts_used?: string | null
+  labor_cost?: number | null
+  parts_cost?: number | null
+  total_cost?: number | null
   status: TicketStatus
-  estimated_cost?: number | null
-  final_cost?: number | null
   accessories: string[]
-  notes?: string | null
 }
 
 export interface Part {
   id: string
   name: string
   category: string
-  sku?: string | null
   quantity: number
   min_stock: number
   cost_price: number
   sell_price: number
   supplier?: string | null
-  location?: string | null
+  created_at?: string
+  updated_at?: string
 }
 
 export interface ShopSettings {
+  id: string
   shop_name: string
   shop_address: string
   shop_phone: string
-  shop_email: string
-  printer_width: '58' | '80'
-  print_logo: string
-  notify_ready: string
-  notify_delivered: string
-}
-
-export interface Stats {
-  receivedToday: number
-  activeTickets: number
-  readyForPickup: number
-  deliveredToday: number
-  lowStockParts: number
-  ticketsPerDay: { date: string; count: number }[]
+  printer_width: string
+  created_at?: string
+  updated_at?: string
 }
 
 export const STATUS_LABELS: Record<TicketStatus, string> = {

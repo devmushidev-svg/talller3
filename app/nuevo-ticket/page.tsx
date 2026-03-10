@@ -21,24 +21,22 @@ import {
   EQUIPMENT_LABELS,
   ACCESSORY_OPTIONS,
 } from "@/lib/types"
-import { Save, Printer } from "lucide-react"
+import { Save, Printer, Loader2 } from "lucide-react"
 import { TicketReceipt } from "@/components/ticket-receipt"
 import { AccessoryLabels } from "@/components/accessory-labels"
-import { store } from "@/lib/store"
 
 export default function NuevoTicketPage() {
   const [clientName, setClientName] = useState("")
   const [clientPhone, setClientPhone] = useState("")
-  const [clientEmail, setClientEmail] = useState("")
   const [equipmentType, setEquipmentType] = useState<EquipmentType>("computadora")
   const [brand, setBrand] = useState("")
   const [model, setModel] = useState("")
   const [serialNumber, setSerialNumber] = useState("")
-  const [reportedIssue, setReportedIssue] = useState("")
-  const [notes, setNotes] = useState("")
+  const [problemDescription, setProblemDescription] = useState("")
   const [accessories, setAccessories] = useState<string[]>([])
   const [savedTicket, setSavedTicket] = useState<Ticket | null>(null)
   const [showPrint, setShowPrint] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   const printRef = useRef<HTMLDivElement>(null)
 
@@ -53,55 +51,71 @@ export default function NuevoTicketPage() {
   const resetForm = () => {
     setClientName("")
     setClientPhone("")
-    setClientEmail("")
     setEquipmentType("computadora")
     setBrand("")
     setModel("")
     setSerialNumber("")
-    setReportedIssue("")
-    setNotes("")
+    setProblemDescription("")
     setAccessories([])
     setSavedTicket(null)
     setShowPrint(false)
   }
 
-  const handleSave = (shouldPrint: boolean = false) => {
-    if (!clientName || !clientPhone || !brand || !model || !reportedIssue) {
+  const handleSave = async (shouldPrint: boolean = false) => {
+    if (!clientName || !clientPhone || !problemDescription) {
       alert("Por favor complete los campos obligatorios")
       return
     }
 
-    const ticket = store.createTicket({
-      client_name: clientName,
-      client_phone: clientPhone,
-      client_email: clientEmail || null,
-      equipment_type: equipmentType,
-      brand,
-      model,
-      serial_number: serialNumber || null,
-      reported_issue: reportedIssue,
-      diagnosis: null,
-      solution: null,
-      notes: notes || null,
-      accessories,
-      status: "recibido",
-      estimated_cost: null,
-      final_cost: null,
-    })
+    setSaving(true)
 
-    setSavedTicket(ticket)
+    try {
+      const response = await fetch("/api/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_name: clientName,
+          client_phone: clientPhone,
+          equipment_type: equipmentType,
+          brand: brand || null,
+          model: model || null,
+          serial_number: serialNumber || null,
+          problem_description: problemDescription,
+          accessories,
+        }),
+      })
 
-    if (shouldPrint) {
-      setShowPrint(true)
-      setTimeout(() => {
-        window.print()
+      if (!response.ok) throw new Error("Error al guardar")
+
+      const ticket = await response.json()
+      
+      // Parse accessories back to array if it's a string
+      const parsedTicket: Ticket = {
+        ...ticket,
+        accessories: typeof ticket.accessories === "string" 
+          ? JSON.parse(ticket.accessories) 
+          : ticket.accessories || [],
+      }
+
+      setSavedTicket(parsedTicket)
+
+      if (shouldPrint) {
+        setShowPrint(true)
         setTimeout(() => {
-          resetForm()
-        }, 500)
-      }, 100)
-    } else {
-      alert(`Ticket ${ticket.id} creado correctamente`)
-      resetForm()
+          window.print()
+          setTimeout(() => {
+            resetForm()
+          }, 500)
+        }, 100)
+      } else {
+        alert(`Ticket ${ticket.id} creado correctamente`)
+        resetForm()
+      }
+    } catch (error) {
+      alert("Error al guardar el ticket")
+      console.error(error)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -142,17 +156,6 @@ export default function NuevoTicketPage() {
                   type="tel"
                 />
               </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="clientEmail">Correo Electrónico (opcional)</Label>
-                <Input
-                  id="clientEmail"
-                  value={clientEmail}
-                  onChange={(e) => setClientEmail(e.target.value)}
-                  placeholder="cliente@email.com"
-                  className="h-12 text-lg"
-                  type="email"
-                />
-              </div>
             </CardContent>
           </Card>
 
@@ -184,7 +187,7 @@ export default function NuevoTicketPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="brand">Marca *</Label>
+                  <Label htmlFor="brand">Marca</Label>
                   <Input
                     id="brand"
                     value={brand}
@@ -194,7 +197,7 @@ export default function NuevoTicketPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="model">Modelo *</Label>
+                  <Label htmlFor="model">Modelo</Label>
                   <Input
                     id="model"
                     value={model}
@@ -216,24 +219,13 @@ export default function NuevoTicketPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="reportedIssue">Problema Reportado *</Label>
+                <Label htmlFor="problemDescription">Problema Reportado *</Label>
                 <Textarea
-                  id="reportedIssue"
-                  value={reportedIssue}
-                  onChange={(e) => setReportedIssue(e.target.value)}
+                  id="problemDescription"
+                  value={problemDescription}
+                  onChange={(e) => setProblemDescription(e.target.value)}
                   placeholder="Describa el problema del equipo..."
                   className="min-h-24 text-base"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="notes">Observaciones Internas</Label>
-                <Textarea
-                  id="notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Notas para el técnico..."
-                  className="min-h-20 text-base"
                 />
               </div>
             </CardContent>
@@ -271,16 +263,26 @@ export default function NuevoTicketPage() {
               size="lg"
               variant="secondary"
               className="h-14 flex-1 text-lg"
+              disabled={saving}
             >
-              <Save className="mr-2 h-5 w-5" />
+              {saving ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-5 w-5" />
+              )}
               Guardar Ticket
             </Button>
             <Button
               onClick={() => handleSave(true)}
               size="lg"
               className="h-14 flex-1 text-lg"
+              disabled={saving}
             >
-              <Printer className="mr-2 h-5 w-5" />
+              {saving ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <Printer className="mr-2 h-5 w-5" />
+              )}
               Guardar e Imprimir Ticket
             </Button>
           </div>

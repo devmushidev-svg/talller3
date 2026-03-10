@@ -34,9 +34,8 @@ import {
   STATUS_LABELS,
   EQUIPMENT_LABELS,
 } from "@/lib/types"
-import { Search, Eye, Printer } from "lucide-react"
+import { Search, Eye, Printer, Loader2 } from "lucide-react"
 import { TicketReceipt } from "@/components/ticket-receipt"
-import { store } from "@/lib/store"
 
 const statusOptions: TicketStatus[] = [
   "recibido",
@@ -51,19 +50,70 @@ export default function TicketsActivosPage() {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const [showPrint, setShowPrint] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  const fetchTickets = async () => {
+    try {
+      const response = await fetch("/api/tickets")
+      const data = await response.json()
+      
+      // Parse accessories and filter active tickets
+      const parsedTickets = data
+        .map((t: Ticket) => ({
+          ...t,
+          accessories: typeof t.accessories === "string" 
+            ? JSON.parse(t.accessories) 
+            : t.accessories || [],
+        }))
+        .filter((t: Ticket) => t.status !== "entregado")
+
+      setTickets(parsedTickets)
+    } catch (error) {
+      console.error("Error fetching tickets:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    setTickets(store.searchTickets(searchTerm, true))
-  }, [searchTerm])
+    fetchTickets()
+  }, [])
 
-  const handleStatusChange = (ticketId: string, newStatus: TicketStatus) => {
-    store.updateTicket(ticketId, { status: newStatus })
-    setTickets(store.searchTickets(searchTerm, true))
+  const filteredTickets = tickets.filter((ticket) => {
+    const search = searchTerm.toLowerCase()
+    return (
+      ticket.client_name.toLowerCase().includes(search) ||
+      ticket.id.toLowerCase().includes(search) ||
+      ticket.client_phone.includes(search) ||
+      (ticket.serial_number?.toLowerCase().includes(search) ?? false)
+    )
+  })
 
-    if (selectedTicket?.id === ticketId) {
-      setSelectedTicket((prev) =>
-        prev ? { ...prev, status: newStatus } : null
+  const handleStatusChange = async (ticketId: string, newStatus: TicketStatus) => {
+    try {
+      await fetch(`/api/tickets/${ticketId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      setTickets((prev) =>
+        prev.map((t) => (t.id === ticketId ? { ...t, status: newStatus } : t))
       )
+
+      if (selectedTicket?.id === ticketId) {
+        setSelectedTicket((prev) =>
+          prev ? { ...prev, status: newStatus } : null
+        )
+      }
+
+      // If status changed to entregado, remove from list
+      if (newStatus === "entregado") {
+        setTickets((prev) => prev.filter((t) => t.id !== ticketId))
+        setSelectedTicket(null)
+      }
+    } catch (error) {
+      console.error("Error updating status:", error)
     }
   }
 
@@ -84,6 +134,16 @@ export default function TicketsActivosPage() {
     })
   }
 
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </DashboardLayout>
+    )
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -92,7 +152,7 @@ export default function TicketsActivosPage() {
           <div>
             <h1 className="text-2xl font-bold text-foreground">Tickets Activos</h1>
             <p className="text-muted-foreground">
-              {tickets.length} equipos en reparación
+              {filteredTickets.length} equipos en reparación
             </p>
           </div>
           <div className="relative w-full sm:w-80">
@@ -124,7 +184,7 @@ export default function TicketsActivosPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {tickets.length === 0 ? (
+                  {filteredTickets.length === 0 ? (
                     <TableRow>
                       <TableCell
                         colSpan={8}
@@ -134,7 +194,7 @@ export default function TicketsActivosPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    tickets.map((ticket) => (
+                    filteredTickets.map((ticket) => (
                       <TableRow
                         key={ticket.id}
                         className="cursor-pointer hover:bg-muted/50"
@@ -154,10 +214,10 @@ export default function TicketsActivosPage() {
                           {EQUIPMENT_LABELS[ticket.equipment_type]}
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
-                          {ticket.brand}
+                          {ticket.brand || "-"}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">
-                          {ticket.model}
+                          {ticket.model || "-"}
                         </TableCell>
                         <TableCell>
                           <Select
@@ -257,11 +317,11 @@ export default function TicketsActivosPage() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Marca</p>
-                    <p className="font-medium">{selectedTicket.brand}</p>
+                    <p className="font-medium">{selectedTicket.brand || "-"}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Modelo</p>
-                    <p className="font-medium">{selectedTicket.model}</p>
+                    <p className="font-medium">{selectedTicket.model || "-"}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Serie</p>
@@ -274,18 +334,8 @@ export default function TicketsActivosPage() {
                 {/* Problem */}
                 <div>
                   <p className="text-sm text-muted-foreground">Problema Reportado</p>
-                  <p className="font-medium">{selectedTicket.reported_issue}</p>
+                  <p className="font-medium">{selectedTicket.problem_description}</p>
                 </div>
-
-                {/* Internal Notes */}
-                {selectedTicket.notes && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      Observaciones Internas
-                    </p>
-                    <p className="font-medium">{selectedTicket.notes}</p>
-                  </div>
-                )}
 
                 {/* Accessories */}
                 <div>

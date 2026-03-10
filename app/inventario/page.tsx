@@ -40,55 +40,62 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Part, PART_CATEGORIES } from "@/lib/types"
-import { Search, Plus, Pencil, Trash2, AlertTriangle } from "lucide-react"
-import { store } from "@/lib/store"
+import { Search, Plus, Pencil, Trash2, AlertTriangle, Loader2 } from "lucide-react"
 
 interface PartFormData {
   name: string
   category: string
-  sku: string
   quantity: number
   min_stock: number
   cost_price: number
   sell_price: number
   supplier: string
-  location: string
 }
 
 const emptyPart: PartFormData = {
   name: "",
   category: "",
-  sku: "",
   quantity: 0,
   min_stock: 5,
   cost_price: 0,
   sell_price: 0,
   supplier: "",
-  location: "",
 }
 
 export default function InventarioPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [parts, setParts] = useState<Part[]>([])
-  const [lowStockParts, setLowStockParts] = useState<Part[]>([])
+  const [loading, setLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingPart, setEditingPart] = useState<Part | null>(null)
   const [formData, setFormData] = useState<PartFormData>(emptyPart)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
-  const loadParts = () => {
-    let filtered = store.searchParts(searchTerm)
-    if (categoryFilter !== "all") {
-      filtered = filtered.filter((p) => p.category === categoryFilter)
+  const fetchParts = async () => {
+    try {
+      const response = await fetch("/api/parts")
+      const data = await response.json()
+      setParts(data)
+    } catch (error) {
+      console.error("Error fetching parts:", error)
+    } finally {
+      setLoading(false)
     }
-    setParts(filtered)
-    setLowStockParts(store.getLowStockParts())
   }
 
   useEffect(() => {
-    loadParts()
-  }, [searchTerm, categoryFilter])
+    fetchParts()
+  }, [])
+
+  const filteredParts = parts.filter((part) => {
+    const matchesSearch = part.name.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesCategory = categoryFilter === "all" || part.category === categoryFilter
+    return matchesSearch && matchesCategory
+  })
+
+  const lowStockParts = parts.filter((p) => p.quantity <= p.min_stock)
 
   const handleOpenDialog = (part?: Part) => {
     if (part) {
@@ -96,13 +103,11 @@ export default function InventarioPage() {
       setFormData({
         name: part.name,
         category: part.category,
-        sku: part.sku || "",
         quantity: part.quantity,
         min_stock: part.min_stock,
         cost_price: part.cost_price,
         sell_price: part.sell_price,
         supplier: part.supplier || "",
-        location: part.location || "",
       })
     } else {
       setEditingPart(null)
@@ -111,27 +116,47 @@ export default function InventarioPage() {
     setIsDialogOpen(true)
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name || !formData.category) {
       alert("Por favor complete los campos obligatorios")
       return
     }
 
-    if (editingPart) {
-      store.updatePart(editingPart.id, formData)
-    } else {
-      store.createPart(formData)
-    }
+    setSaving(true)
 
-    setIsDialogOpen(false)
-    loadParts()
+    try {
+      if (editingPart) {
+        await fetch(`/api/parts/${editingPart.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        })
+      } else {
+        await fetch("/api/parts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        })
+      }
+
+      setIsDialogOpen(false)
+      fetchParts()
+    } catch (error) {
+      console.error("Error saving part:", error)
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deleteId) {
-      store.deletePart(deleteId)
-      setDeleteId(null)
-      loadParts()
+      try {
+        await fetch(`/api/parts/${deleteId}`, { method: "DELETE" })
+        setDeleteId(null)
+        fetchParts()
+      } catch (error) {
+        console.error("Error deleting part:", error)
+      }
     }
   }
 
@@ -140,6 +165,16 @@ export default function InventarioPage() {
       style: "currency",
       currency: "MXN",
     }).format(value)
+  }
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </DashboardLayout>
+    )
   }
 
   return (
@@ -209,7 +244,6 @@ export default function InventarioPage() {
                   <TableRow>
                     <TableHead>Nombre</TableHead>
                     <TableHead className="hidden sm:table-cell">Categoría</TableHead>
-                    <TableHead className="hidden md:table-cell">SKU</TableHead>
                     <TableHead className="text-center">Stock</TableHead>
                     <TableHead className="hidden text-center lg:table-cell">
                       Mín.
@@ -220,17 +254,17 @@ export default function InventarioPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {parts.length === 0 ? (
+                  {filteredParts.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={8}
+                        colSpan={7}
                         className="py-8 text-center text-muted-foreground"
                       >
                         No se encontraron piezas
                       </TableCell>
                     </TableRow>
                   ) : (
-                    parts.map((part) => (
+                    filteredParts.map((part) => (
                       <TableRow key={part.id}>
                         <TableCell>
                           <div>
@@ -242,9 +276,6 @@ export default function InventarioPage() {
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">
                           {part.category}
-                        </TableCell>
-                        <TableCell className="hidden font-mono text-xs text-muted-foreground md:table-cell">
-                          {part.sku || "-"}
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge
@@ -339,31 +370,6 @@ export default function InventarioPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="sku">SKU</Label>
-                <Input
-                  id="sku"
-                  value={formData.sku}
-                  onChange={(e) =>
-                    setFormData({ ...formData, sku: e.target.value })
-                  }
-                  placeholder="Código SKU"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="location">Ubicación</Label>
-                <Input
-                  id="location"
-                  value={formData.location}
-                  onChange={(e) =>
-                    setFormData({ ...formData, location: e.target.value })
-                  }
-                  placeholder="Estante A1..."
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
                 <Label htmlFor="quantity">Cantidad</Label>
                 <Input
                   id="quantity"
@@ -447,7 +453,8 @@ export default function InventarioPage() {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSave}>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {editingPart ? "Guardar Cambios" : "Agregar Pieza"}
             </Button>
           </DialogFooter>

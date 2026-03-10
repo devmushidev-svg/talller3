@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Package, ClipboardList, CheckCircle, Truck } from "lucide-react"
+import { Package, ClipboardList, CheckCircle, Truck, Loader2 } from "lucide-react"
 import {
   BarChart,
   Bar,
@@ -13,44 +13,61 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts"
-import { store } from "@/lib/store"
+
+interface Stats {
+  receivedToday: number
+  activeTickets: number
+  readyForPickup: number
+  deliveredToday: number
+  ticketsPerDay: { date: string; tickets: number }[]
+}
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState({
-    receivedToday: 0,
-    active: 0,
-    ready: 0,
-    deliveredToday: 0,
-    chartData: [] as { name: string; tickets: number }[],
-  })
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const data = store.getStats()
-    setStats(data)
+    fetch("/api/stats")
+      .then((res) => res.json())
+      .then((data) => {
+        setStats(data)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
   }, [])
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </DashboardLayout>
+    )
+  }
 
   const statCards = [
     {
       title: "Equipos Recibidos Hoy",
-      value: stats.receivedToday,
+      value: stats?.receivedToday ?? 0,
       icon: Package,
       color: "text-primary",
     },
     {
       title: "Tickets Activos",
-      value: stats.active,
+      value: stats?.activeTickets ?? 0,
       icon: ClipboardList,
       color: "text-warning",
     },
     {
       title: "Listos para Entregar",
-      value: stats.ready,
+      value: stats?.readyForPickup ?? 0,
       icon: CheckCircle,
       color: "text-success",
     },
     {
       title: "Entregados Hoy",
-      value: stats.deliveredToday,
+      value: stats?.deliveredToday ?? 0,
       icon: Truck,
       color: "text-muted-foreground",
     },
@@ -87,10 +104,10 @@ export default function DashboardPage() {
           <CardContent>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.chartData}>
+                <BarChart data={stats?.ticketsPerDay ?? []}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                   <XAxis
-                    dataKey="name"
+                    dataKey="date"
                     className="text-xs fill-muted-foreground"
                     tick={{ fontSize: 12 }}
                   />

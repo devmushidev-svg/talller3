@@ -21,30 +21,49 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Ticket, EQUIPMENT_LABELS } from "@/lib/types"
-import { Search, Eye } from "lucide-react"
-import { store } from "@/lib/store"
+import { Search, Eye, Loader2 } from "lucide-react"
 
 export default function HistorialPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const completed = store.getCompletedTickets()
-    if (searchTerm) {
-      const q = searchTerm.toLowerCase()
-      setTickets(
-        completed.filter(
-          (t) =>
-            t.client_name.toLowerCase().includes(q) ||
-            t.client_phone.includes(q) ||
-            (t.serial_number && t.serial_number.toLowerCase().includes(q))
-        )
-      )
-    } else {
-      setTickets(completed)
+    const fetchTickets = async () => {
+      try {
+        const response = await fetch("/api/tickets")
+        const data = await response.json()
+        
+        // Parse accessories and filter completed tickets
+        const completedTickets = data
+          .map((t: Ticket) => ({
+            ...t,
+            accessories: typeof t.accessories === "string" 
+              ? JSON.parse(t.accessories) 
+              : t.accessories || [],
+          }))
+          .filter((t: Ticket) => t.status === "entregado")
+
+        setTickets(completedTickets)
+      } catch (error) {
+        console.error("Error fetching tickets:", error)
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [searchTerm])
+
+    fetchTickets()
+  }, [])
+
+  const filteredTickets = tickets.filter((ticket) => {
+    const search = searchTerm.toLowerCase()
+    return (
+      ticket.client_name.toLowerCase().includes(search) ||
+      ticket.client_phone.includes(search) ||
+      (ticket.serial_number?.toLowerCase().includes(search) ?? false)
+    )
+  })
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString("es-MX", {
@@ -61,6 +80,16 @@ export default function HistorialPage() {
     }).format(value)
   }
 
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </DashboardLayout>
+    )
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -69,7 +98,7 @@ export default function HistorialPage() {
           <div>
             <h1 className="text-2xl font-bold text-foreground">Historial</h1>
             <p className="text-muted-foreground">
-              {tickets.length} tickets completados
+              {filteredTickets.length} tickets completados
             </p>
           </div>
           <div className="relative w-full sm:w-80">
@@ -100,7 +129,7 @@ export default function HistorialPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {tickets.length === 0 ? (
+                  {filteredTickets.length === 0 ? (
                     <TableRow>
                       <TableCell
                         colSpan={7}
@@ -110,7 +139,7 @@ export default function HistorialPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    tickets.map((ticket) => (
+                    filteredTickets.map((ticket) => (
                       <TableRow key={ticket.id}>
                         <TableCell className="font-mono text-xs font-medium">
                           {ticket.id}
@@ -126,7 +155,7 @@ export default function HistorialPage() {
                         <TableCell className="hidden sm:table-cell">
                           <div>
                             <p>
-                              {ticket.brand} {ticket.model}
+                              {ticket.brand || ""} {ticket.model || ""}
                             </p>
                             <p className="text-sm text-muted-foreground">
                               {EQUIPMENT_LABELS[ticket.equipment_type]}
@@ -137,11 +166,13 @@ export default function HistorialPage() {
                           {formatDate(ticket.created_at)}
                         </TableCell>
                         <TableCell className="hidden text-muted-foreground lg:table-cell">
-                          {formatDate(ticket.updated_at)}
+                          {ticket.delivered_at
+                            ? formatDate(ticket.delivered_at)
+                            : formatDate(ticket.updated_at)}
                         </TableCell>
                         <TableCell className="text-right font-medium">
-                          {ticket.final_cost
-                            ? formatCurrency(ticket.final_cost)
+                          {ticket.total_cost
+                            ? formatCurrency(ticket.total_cost)
                             : "-"}
                         </TableCell>
                         <TableCell>
@@ -198,11 +229,11 @@ export default function HistorialPage() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Marca</p>
-                    <p className="font-medium">{selectedTicket.brand}</p>
+                    <p className="font-medium">{selectedTicket.brand || "-"}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Modelo</p>
-                    <p className="font-medium">{selectedTicket.model}</p>
+                    <p className="font-medium">{selectedTicket.model || "-"}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Serie</p>
@@ -227,7 +258,9 @@ export default function HistorialPage() {
                       Fecha de Entrega
                     </p>
                     <p className="font-medium">
-                      {formatDate(selectedTicket.updated_at)}
+                      {selectedTicket.delivered_at
+                        ? formatDate(selectedTicket.delivered_at)
+                        : formatDate(selectedTicket.updated_at)}
                     </p>
                   </div>
                 </div>
@@ -237,7 +270,7 @@ export default function HistorialPage() {
                   <p className="text-sm text-muted-foreground">
                     Problema Reportado
                   </p>
-                  <p className="font-medium">{selectedTicket.reported_issue}</p>
+                  <p className="font-medium">{selectedTicket.problem_description}</p>
                 </div>
 
                 {/* Diagnosis */}
@@ -248,13 +281,13 @@ export default function HistorialPage() {
                   </div>
                 )}
 
-                {/* Solution */}
-                {selectedTicket.solution && (
+                {/* Repair Notes */}
+                {selectedTicket.repair_notes && (
                   <div>
                     <p className="text-sm text-muted-foreground">
-                      Solución Aplicada
+                      Notas de Reparación
                     </p>
-                    <p className="font-medium">{selectedTicket.solution}</p>
+                    <p className="font-medium">{selectedTicket.repair_notes}</p>
                   </div>
                 )}
 
@@ -279,16 +312,16 @@ export default function HistorialPage() {
                 </div>
 
                 {/* Total */}
-                {selectedTicket.final_cost && (
+                {selectedTicket.total_cost ? (
                   <div className="border-t pt-4">
                     <p className="text-sm text-muted-foreground">
                       Total de Reparación
                     </p>
                     <p className="text-2xl font-bold text-primary">
-                      {formatCurrency(selectedTicket.final_cost)}
+                      {formatCurrency(selectedTicket.total_cost)}
                     </p>
                   </div>
-                )}
+                ) : null}
               </div>
             </>
           )}
