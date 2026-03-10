@@ -118,15 +118,19 @@ export function TicketReceipt({ ticket, settings, onPrint }: TicketReceiptProps)
     `)
     doc.close()
 
-    iframe.onload = () => {
-      setTimeout(() => {
+    setTimeout(() => {
+      try {
         iframe.contentWindow?.focus()
         iframe.contentWindow?.print()
-        setTimeout(() => {
+      } catch (e) {
+        console.error('Print error:', e)
+      }
+      setTimeout(() => {
+        if (iframe.parentNode) {
           document.body.removeChild(iframe)
-        }, 100)
-      }, 100)
-    }
+        }
+      }, 1000)
+    }, 250)
 
     onPrint?.()
   }
