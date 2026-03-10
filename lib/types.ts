@@ -7,11 +7,14 @@ export type TicketStatus =
   | 'listo' 
   | 'entregado'
 
+export type PaymentStatus = 'pendiente' | 'parcial' | 'pagado'
+
 export interface Ticket {
   id: string
   created_at: string
   updated_at: string
   delivered_at?: string | null
+  estimated_delivery_date?: string | null
   client_name: string
   client_phone: string
   equipment_type: EquipmentType
@@ -21,12 +24,28 @@ export interface Ticket {
   problem_description: string
   diagnosis?: string | null
   repair_notes?: string | null
+  internal_notes?: string | null
   parts_used?: string | null
+  diagnosis_cost?: number | null
+  repair_cost?: number | null
   labor_cost?: number | null
   parts_cost?: number | null
   total_cost?: number | null
+  amount_paid?: number | null
+  payment_status?: PaymentStatus | null
   status: TicketStatus
   accessories: string[]
+  photos?: string[]
+}
+
+export interface Customer {
+  id: string
+  name: string
+  phone: string
+  email?: string | null
+  address?: string | null
+  created_at?: string
+  updated_at?: string
 }
 
 export interface Part {
@@ -66,6 +85,18 @@ export const STATUS_COLORS: Record<TicketStatus, string> = {
   en_reparacion: 'bg-chart-2 text-white',
   listo: 'bg-success text-success-foreground',
   entregado: 'bg-muted text-muted-foreground'
+}
+
+export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+  pendiente: 'Pendiente',
+  parcial: 'Pago Parcial',
+  pagado: 'Pagado'
+}
+
+export const PAYMENT_STATUS_COLORS: Record<PaymentStatus, string> = {
+  pendiente: 'bg-destructive text-destructive-foreground',
+  parcial: 'bg-warning text-warning-foreground',
+  pagado: 'bg-success text-success-foreground'
 }
 
 export const EQUIPMENT_LABELS: Record<EquipmentType, string> = {
