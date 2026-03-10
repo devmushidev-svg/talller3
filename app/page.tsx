@@ -2,54 +2,41 @@
 
 import { DashboardLayout } from '@/components/dashboard-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { getTodayStats, getTicketsPerDay } from '@/lib/store'
 import { Package, ClipboardList, CheckCircle, Truck } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { useEffect, useState } from 'react'
+import useSWR from 'swr'
+import { Stats } from '@/lib/types'
+import { Spinner } from '@/components/ui/spinner'
 
-interface Stats {
-  receivedToday: number
-  activeTickets: number
-  readyToDeliver: number
-  deliveredToday: number
-}
-
-interface DayData {
-  date: string
-  count: number
-}
+const fetcher = (url: string) => fetch(url).then(res => res.json())
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<Stats>({ receivedToday: 0, activeTickets: 0, readyToDeliver: 0, deliveredToday: 0 })
-  const [chartData, setChartData] = useState<DayData[]>([])
-
-  useEffect(() => {
-    setStats(getTodayStats())
-    setChartData(getTicketsPerDay(7))
-  }, [])
+  const { data: stats, isLoading } = useSWR<Stats>('/api/stats', fetcher, {
+    refreshInterval: 30000 // Refresh every 30 seconds
+  })
 
   const statCards = [
     {
       title: 'Equipos Recibidos Hoy',
-      value: stats.receivedToday,
+      value: stats?.receivedToday ?? 0,
       icon: Package,
       color: 'text-chart-1'
     },
     {
       title: 'Tickets Activos',
-      value: stats.activeTickets,
+      value: stats?.activeTickets ?? 0,
       icon: ClipboardList,
       color: 'text-chart-2'
     },
     {
       title: 'Listos para Entregar',
-      value: stats.readyToDeliver,
+      value: stats?.readyForPickup ?? 0,
       icon: CheckCircle,
       color: 'text-success'
     },
     {
       title: 'Equipos Entregados',
-      value: stats.deliveredToday,
+      value: stats?.deliveredToday ?? 0,
       icon: Truck,
       color: 'text-muted-foreground'
     }
@@ -75,7 +62,11 @@ export default function DashboardPage() {
                 <stat.icon className={`h-5 w-5 ${stat.color}`} />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">{stat.value}</div>
+                {isLoading ? (
+                  <Spinner className="h-6 w-6" />
+                ) : (
+                  <div className="text-3xl font-bold">{stat.value}</div>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -88,37 +79,43 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis 
-                    dataKey="date" 
-                    className="text-xs fill-muted-foreground"
-                    tick={{ fontSize: 12 }}
-                  />
-                  <YAxis 
-                    className="text-xs fill-muted-foreground"
-                    tick={{ fontSize: 12 }}
-                    allowDecimals={false}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }}
-                    labelStyle={{ color: 'hsl(var(--foreground))' }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="count" 
-                    stroke="hsl(var(--primary))" 
-                    strokeWidth={2}
-                    dot={{ fill: 'hsl(var(--primary))' }}
-                    name="Tickets"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              {isLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <Spinner className="h-8 w-8" />
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={stats?.ticketsPerDay ?? []}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis 
+                      dataKey="date" 
+                      className="text-xs fill-muted-foreground"
+                      tick={{ fontSize: 12 }}
+                    />
+                    <YAxis 
+                      className="text-xs fill-muted-foreground"
+                      tick={{ fontSize: 12 }}
+                      allowDecimals={false}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }}
+                      labelStyle={{ color: 'hsl(var(--foreground))' }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="count" 
+                      stroke="hsl(var(--primary))" 
+                      strokeWidth={2}
+                      dot={{ fill: 'hsl(var(--primary))' }}
+                      name="Tickets"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>

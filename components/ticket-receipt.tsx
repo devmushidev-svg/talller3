@@ -1,6 +1,6 @@
 'use client'
 
-import { Ticket, ACCESSORY_LABELS, AccessoryKey } from '@/lib/types'
+import { Ticket, EQUIPMENT_LABELS } from '@/lib/types'
 import { QRCodeSVG } from 'qrcode.react'
 
 interface TicketReceiptProps {
@@ -9,11 +9,8 @@ interface TicketReceiptProps {
 }
 
 export function TicketReceipt({ ticket, shopName = 'TALLER DE REPARACIÓN' }: TicketReceiptProps) {
-  const selectedAccessories = (Object.keys(ACCESSORY_LABELS) as AccessoryKey[])
-    .filter(key => ticket.accessories[key])
-  
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleString('es-MX', {
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleString('es-MX', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -35,11 +32,11 @@ export function TicketReceipt({ ticket, shopName = 'TALLER DE REPARACIÓN' }: Ti
 
       {/* Ticket Info */}
       <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-        <p style={{ fontSize: '14px', fontWeight: 'bold', margin: 0 }}>
-          TICKET #{String(ticket.ticketNumber).padStart(5, '0')}
+        <p style={{ fontSize: '12px', fontWeight: 'bold', margin: 0 }}>
+          TICKET: {ticket.id}
         </p>
         <p style={{ fontSize: '10px', margin: '2px 0' }}>
-          {formatDate(ticket.createdAt)}
+          {formatDate(ticket.created_at)}
         </p>
       </div>
 
@@ -49,11 +46,16 @@ export function TicketReceipt({ ticket, shopName = 'TALLER DE REPARACIÓN' }: Ti
       {/* Client Info */}
       <div style={{ marginBottom: '8px' }}>
         <p style={{ fontSize: '11px', margin: '2px 0' }}>
-          <strong>Cliente:</strong> {ticket.clientName}
+          <strong>Cliente:</strong> {ticket.client_name}
         </p>
         <p style={{ fontSize: '11px', margin: '2px 0' }}>
-          <strong>Tel:</strong> {ticket.phone}
+          <strong>Tel:</strong> {ticket.client_phone}
         </p>
+        {ticket.client_email && (
+          <p style={{ fontSize: '11px', margin: '2px 0' }}>
+            <strong>Email:</strong> {ticket.client_email}
+          </p>
+        )}
       </div>
 
       {/* Divider */}
@@ -62,7 +64,7 @@ export function TicketReceipt({ ticket, shopName = 'TALLER DE REPARACIÓN' }: Ti
       {/* Equipment Info */}
       <div style={{ marginBottom: '8px' }}>
         <p style={{ fontSize: '11px', margin: '2px 0' }}>
-          <strong>Equipo:</strong> {ticket.equipmentType}
+          <strong>Equipo:</strong> {EQUIPMENT_LABELS[ticket.equipment_type]}
         </p>
         <p style={{ fontSize: '11px', margin: '2px 0' }}>
           <strong>Marca:</strong> {ticket.brand}
@@ -70,9 +72,9 @@ export function TicketReceipt({ ticket, shopName = 'TALLER DE REPARACIÓN' }: Ti
         <p style={{ fontSize: '11px', margin: '2px 0' }}>
           <strong>Modelo:</strong> {ticket.model}
         </p>
-        {ticket.serialNumber && (
+        {ticket.serial_number && (
           <p style={{ fontSize: '11px', margin: '2px 0' }}>
-            <strong>Serie:</strong> {ticket.serialNumber}
+            <strong>Serie:</strong> {ticket.serial_number}
           </p>
         )}
       </div>
@@ -86,7 +88,7 @@ export function TicketReceipt({ ticket, shopName = 'TALLER DE REPARACIÓN' }: Ti
           PROBLEMA REPORTADO:
         </p>
         <p style={{ fontSize: '10px', margin: '2px 0' }}>
-          {ticket.reportedProblem}
+          {ticket.reported_issue}
         </p>
       </div>
 
@@ -94,15 +96,14 @@ export function TicketReceipt({ ticket, shopName = 'TALLER DE REPARACIÓN' }: Ti
       <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
 
       {/* Accessories */}
-      {selectedAccessories.length > 0 && (
+      {ticket.accessories.length > 0 && (
         <div style={{ marginBottom: '8px' }}>
           <p style={{ fontSize: '11px', fontWeight: 'bold', margin: '2px 0' }}>
             ACCESORIOS RECIBIDOS:
           </p>
-          {selectedAccessories.map(key => (
-            <p key={key} style={{ fontSize: '10px', margin: '1px 0' }}>
-              {'✓'} {ACCESSORY_LABELS[key]}
-              {key === 'otros' && ticket.accessories.otrosDetalle && `: ${ticket.accessories.otrosDetalle}`}
+          {ticket.accessories.map(acc => (
+            <p key={acc} style={{ fontSize: '10px', margin: '1px 0' }}>
+              {'✓'} {acc}
             </p>
           ))}
         </div>
@@ -114,7 +115,7 @@ export function TicketReceipt({ ticket, shopName = 'TALLER DE REPARACIÓN' }: Ti
       {/* QR Code */}
       <div style={{ textAlign: 'center', marginTop: '8px', marginBottom: '8px' }}>
         <QRCodeSVG 
-          value={`TICKET-${ticket.ticketNumber}`}
+          value={`TICKET-${ticket.id}`}
           size={64}
           style={{ margin: '0 auto' }}
         />

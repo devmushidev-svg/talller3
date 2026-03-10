@@ -9,86 +9,102 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { createTicket } from '@/lib/store'
-import { Ticket, EquipmentType, ACCESSORY_LABELS, AccessoryKey } from '@/lib/types'
+import { Ticket, EquipmentType, EQUIPMENT_LABELS, ACCESSORY_OPTIONS } from '@/lib/types'
 import { Save, Printer } from 'lucide-react'
 import { TicketReceipt } from '@/components/ticket-receipt'
 import { AccessoryLabels } from '@/components/accessory-labels'
-
-const initialAccessories = {
-  cablePoder: false,
-  cableUSB: false,
-  cargador: false,
-  cartucho: false,
-  toner: false,
-  otros: false,
-  otrosDetalle: ''
-}
+import { Spinner } from '@/components/ui/spinner'
 
 export default function NuevoTicketPage() {
   const [clientName, setClientName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [equipmentType, setEquipmentType] = useState<EquipmentType>('Computadora')
+  const [clientPhone, setClientPhone] = useState('')
+  const [clientEmail, setClientEmail] = useState('')
+  const [equipmentType, setEquipmentType] = useState<EquipmentType>('computadora')
   const [brand, setBrand] = useState('')
   const [model, setModel] = useState('')
   const [serialNumber, setSerialNumber] = useState('')
-  const [reportedProblem, setReportedProblem] = useState('')
-  const [internalNotes, setInternalNotes] = useState('')
-  const [accessories, setAccessories] = useState(initialAccessories)
+  const [reportedIssue, setReportedIssue] = useState('')
+  const [notes, setNotes] = useState('')
+  const [accessories, setAccessories] = useState<string[]>([])
   const [savedTicket, setSavedTicket] = useState<Ticket | null>(null)
   const [showPrint, setShowPrint] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   
   const printRef = useRef<HTMLDivElement>(null)
 
-  const handleAccessoryChange = (key: AccessoryKey, checked: boolean) => {
-    setAccessories(prev => ({ ...prev, [key]: checked }))
+  const handleAccessoryChange = (accessory: string, checked: boolean) => {
+    if (checked) {
+      setAccessories(prev => [...prev, accessory])
+    } else {
+      setAccessories(prev => prev.filter(a => a !== accessory))
+    }
   }
 
   const resetForm = () => {
     setClientName('')
-    setPhone('')
-    setEquipmentType('Computadora')
+    setClientPhone('')
+    setClientEmail('')
+    setEquipmentType('computadora')
     setBrand('')
     setModel('')
     setSerialNumber('')
-    setReportedProblem('')
-    setInternalNotes('')
-    setAccessories(initialAccessories)
+    setReportedIssue('')
+    setNotes('')
+    setAccessories([])
     setSavedTicket(null)
     setShowPrint(false)
   }
 
-  const handleSave = (shouldPrint: boolean = false) => {
-    if (!clientName || !phone || !brand || !model || !reportedProblem) {
+  const handleSave = async (shouldPrint: boolean = false) => {
+    if (!clientName || !clientPhone || !brand || !model || !reportedIssue) {
       alert('Por favor complete los campos obligatorios')
       return
     }
 
-    const ticket = createTicket({
-      clientName,
-      phone,
-      equipmentType,
-      brand,
-      model,
-      serialNumber,
-      reportedProblem,
-      internalNotes,
-      accessories,
-      status: 'Recibido'
-    })
+    setIsSaving(true)
 
-    setSavedTicket(ticket)
+    try {
+      const response = await fetch('/api/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientName,
+          clientPhone,
+          clientEmail: clientEmail || null,
+          equipmentType,
+          brand,
+          model,
+          serialNumber: serialNumber || null,
+          reportedIssue,
+          notes: notes || null,
+          accessories
+        })
+      })
 
-    if (shouldPrint) {
-      setShowPrint(true)
-      setTimeout(() => {
-        window.print()
+      if (!response.ok) {
+        throw new Error('Error al guardar el ticket')
+      }
+
+      const ticket = await response.json()
+      setSavedTicket(ticket)
+
+      if (shouldPrint) {
+        setShowPrint(true)
         setTimeout(() => {
-          resetForm()
-        }, 500)
-      }, 100)
-    } else {
-      resetForm()
+          window.print()
+          setTimeout(() => {
+            resetForm()
+          }, 500)
+        }, 100)
+      } else {
+        alert(`Ticket ${ticket.id} creado correctamente`)
+        resetForm()
+      }
+    } catch (error) {
+      console.error('Error:', error)
+      alert('Error al guardar el ticket')
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -121,14 +137,25 @@ export default function NuevoTicketPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone">Teléfono *</Label>
+                <Label htmlFor="clientPhone">Teléfono *</Label>
                 <Input
-                  id="phone"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  id="clientPhone"
+                  value={clientPhone}
+                  onChange={(e) => setClientPhone(e.target.value)}
                   placeholder="555-123-4567"
                   className="h-12 text-lg"
                   type="tel"
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="clientEmail">Correo Electrónico (opcional)</Label>
+                <Input
+                  id="clientEmail"
+                  value={clientEmail}
+                  onChange={(e) => setClientEmail(e.target.value)}
+                  placeholder="cliente@email.com"
+                  className="h-12 text-lg"
+                  type="email"
                 />
               </div>
             </CardContent>
@@ -148,8 +175,9 @@ export default function NuevoTicketPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Computadora">Computadora</SelectItem>
-                      <SelectItem value="Impresora">Impresora</SelectItem>
+                      {(Object.keys(EQUIPMENT_LABELS) as EquipmentType[]).map(type => (
+                        <SelectItem key={type} value={type}>{EQUIPMENT_LABELS[type]}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -186,22 +214,22 @@ export default function NuevoTicketPage() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="reportedProblem">Problema Reportado *</Label>
+                <Label htmlFor="reportedIssue">Problema Reportado *</Label>
                 <Textarea
-                  id="reportedProblem"
-                  value={reportedProblem}
-                  onChange={(e) => setReportedProblem(e.target.value)}
+                  id="reportedIssue"
+                  value={reportedIssue}
+                  onChange={(e) => setReportedIssue(e.target.value)}
                   placeholder="Describa el problema del equipo..."
                   className="min-h-24 text-base"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="internalNotes">Observaciones Internas</Label>
+                <Label htmlFor="notes">Observaciones Internas</Label>
                 <Textarea
-                  id="internalNotes"
-                  value={internalNotes}
-                  onChange={(e) => setInternalNotes(e.target.value)}
+                  id="notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
                   placeholder="Notas para el técnico..."
                   className="min-h-20 text-base"
                 />
@@ -215,32 +243,20 @@ export default function NuevoTicketPage() {
               <CardTitle className="text-lg">Accesorios Recibidos</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-                {(Object.keys(ACCESSORY_LABELS) as AccessoryKey[]).map((key) => (
-                  <div key={key} className="flex items-center space-x-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                {ACCESSORY_OPTIONS.map((accessory) => (
+                  <div key={accessory} className="flex items-center space-x-2">
                     <Checkbox
-                      id={key}
-                      checked={accessories[key]}
-                      onCheckedChange={(checked) => handleAccessoryChange(key, checked as boolean)}
+                      id={accessory}
+                      checked={accessories.includes(accessory)}
+                      onCheckedChange={(checked) => handleAccessoryChange(accessory, checked as boolean)}
                     />
-                    <Label htmlFor={key} className="text-sm cursor-pointer">
-                      {ACCESSORY_LABELS[key]}
+                    <Label htmlFor={accessory} className="text-sm cursor-pointer">
+                      {accessory}
                     </Label>
                   </div>
                 ))}
               </div>
-              {accessories.otros && (
-                <div className="mt-4">
-                  <Label htmlFor="otrosDetalle">Especificar otros</Label>
-                  <Input
-                    id="otrosDetalle"
-                    value={accessories.otrosDetalle}
-                    onChange={(e) => setAccessories(prev => ({ ...prev, otrosDetalle: e.target.value }))}
-                    placeholder="Detalle de otros accesorios..."
-                    className="mt-2"
-                  />
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -251,16 +267,18 @@ export default function NuevoTicketPage() {
               size="lg"
               variant="secondary"
               className="flex-1 h-14 text-lg"
+              disabled={isSaving}
             >
-              <Save className="w-5 h-5 mr-2" />
+              {isSaving ? <Spinner className="w-5 h-5 mr-2" /> : <Save className="w-5 h-5 mr-2" />}
               Guardar Ticket
             </Button>
             <Button
               onClick={() => handleSave(true)}
               size="lg"
               className="flex-1 h-14 text-lg"
+              disabled={isSaving}
             >
-              <Printer className="w-5 h-5 mr-2" />
+              {isSaving ? <Spinner className="w-5 h-5 mr-2" /> : <Printer className="w-5 h-5 mr-2" />}
               Guardar e Imprimir Ticket
             </Button>
           </div>

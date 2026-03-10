@@ -1,22 +1,19 @@
 'use client'
 
-import { Ticket, ACCESSORY_LABELS, AccessoryKey } from '@/lib/types'
+import { Ticket } from '@/lib/types'
 
 interface AccessoryLabelsProps {
   ticket: Ticket
 }
 
 export function AccessoryLabels({ ticket }: AccessoryLabelsProps) {
-  const selectedAccessories = (Object.keys(ACCESSORY_LABELS) as AccessoryKey[])
-    .filter(key => ticket.accessories[key])
-
-  if (selectedAccessories.length === 0) return null
+  if (ticket.accessories.length === 0) return null
 
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2mm' }}>
-      {selectedAccessories.map((key) => (
+      {ticket.accessories.map((accessory, index) => (
         <div
-          key={key}
+          key={index}
           className="accessory-label"
           style={{
             width: '38mm',
@@ -31,19 +28,16 @@ export function AccessoryLabels({ ticket }: AccessoryLabelsProps) {
             boxSizing: 'border-box'
           }}
         >
-          <div style={{ fontWeight: 'bold', fontSize: '10px', marginBottom: '1mm' }}>
-            #{String(ticket.ticketNumber).padStart(5, '0')}
+          <div style={{ fontWeight: 'bold', fontSize: '9px', marginBottom: '1mm' }}>
+            {ticket.id}
           </div>
           <div style={{ marginBottom: '1mm' }}>
-            {ticket.clientName.length > 15 
-              ? ticket.clientName.substring(0, 15) + '...' 
-              : ticket.clientName}
+            {ticket.client_name.length > 15 
+              ? ticket.client_name.substring(0, 15) + '...' 
+              : ticket.client_name}
           </div>
           <div style={{ fontWeight: 'bold', fontSize: '9px' }}>
-            {ACCESSORY_LABELS[key]}
-            {key === 'otros' && ticket.accessories.otrosDetalle && (
-              <span style={{ fontWeight: 'normal' }}>: {ticket.accessories.otrosDetalle.substring(0, 10)}</span>
-            )}
+            {accessory}
           </div>
         </div>
       ))}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { DashboardLayout } from '@/components/dashboard-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -15,20 +15,72 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Store, Printer, Bell, Save } from 'lucide-react'
+import { Spinner } from '@/components/ui/spinner'
+import useSWR, { mutate } from 'swr'
+
+const fetcher = (url: string) => fetch(url).then(res => res.json())
 
 export default function ConfiguracionPage() {
-  const [shopName, setShopName] = useState('TALLER DE REPARACIÓN')
-  const [shopPhone, setShopPhone] = useState('555-000-0000')
-  const [shopAddress, setShopAddress] = useState('Av. Principal #123, Col. Centro')
-  const [printerWidth, setPrinterWidth] = useState('80mm')
-  const [autoPrint, setAutoPrint] = useState(true)
-  const [printLabels, setPrintLabels] = useState(true)
-  const [lowStockAlert, setLowStockAlert] = useState(true)
-  const [readyAlert, setReadyAlert] = useState(true)
+  const { data: settings, isLoading } = useSWR<Record<string, string>>('/api/settings', fetcher)
+  
+  const [shopName, setShopName] = useState('')
+  const [shopPhone, setShopPhone] = useState('')
+  const [shopAddress, setShopAddress] = useState('')
+  const [shopEmail, setShopEmail] = useState('')
+  const [printerWidth, setPrinterWidth] = useState('80')
+  const [printLogo, setPrintLogo] = useState(true)
+  const [notifyReady, setNotifyReady] = useState(true)
+  const [notifyDelivered, setNotifyDelivered] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
 
-  const handleSave = () => {
-    // In production, this would save to a database
-    alert('Configuración guardada correctamente')
+  useEffect(() => {
+    if (settings) {
+      setShopName(settings.shop_name || '')
+      setShopPhone(settings.shop_phone || '')
+      setShopAddress(settings.shop_address || '')
+      setShopEmail(settings.shop_email || '')
+      setPrinterWidth(settings.printer_width || '80')
+      setPrintLogo(settings.print_logo === 'true')
+      setNotifyReady(settings.notify_ready === 'true')
+      setNotifyDelivered(settings.notify_delivered === 'true')
+    }
+  }, [settings])
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    try {
+      await fetch('/api/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shop_name: shopName,
+          shop_phone: shopPhone,
+          shop_address: shopAddress,
+          shop_email: shopEmail,
+          printer_width: printerWidth,
+          print_logo: printLogo.toString(),
+          notify_ready: notifyReady.toString(),
+          notify_delivered: notifyDelivered.toString()
+        })
+      })
+      mutate('/api/settings')
+      alert('Configuración guardada correctamente')
+    } catch (error) {
+      console.error('Error:', error)
+      alert('Error al guardar la configuración')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <Spinner className="h-8 w-8" />
+        </div>
+      </DashboardLayout>
+    )
   }
 
   return (
@@ -74,14 +126,24 @@ export default function ConfiguracionPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="shopAddress">Dirección</Label>
+                <Label htmlFor="shopEmail">Correo Electrónico</Label>
                 <Input
-                  id="shopAddress"
-                  value={shopAddress}
-                  onChange={(e) => setShopAddress(e.target.value)}
-                  placeholder="Dirección del taller"
+                  id="shopEmail"
+                  value={shopEmail}
+                  onChange={(e) => setShopEmail(e.target.value)}
+                  placeholder="taller@email.com"
+                  type="email"
                 />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="shopAddress">Dirección</Label>
+              <Input
+                id="shopAddress"
+                value={shopAddress}
+                onChange={(e) => setShopAddress(e.target.value)}
+                placeholder="Dirección del taller"
+              />
             </div>
           </CardContent>
         </Card>
@@ -107,8 +169,8 @@ export default function ConfiguracionPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="58mm">58mm</SelectItem>
-                  <SelectItem value="80mm">80mm</SelectItem>
+                  <SelectItem value="58">58mm</SelectItem>
+                  <SelectItem value="80">80mm</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-sm text-muted-foreground">
@@ -118,29 +180,15 @@ export default function ConfiguracionPage() {
 
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="autoPrint">Imprimir automáticamente</Label>
+                <Label htmlFor="printLogo">Imprimir logo en tickets</Label>
                 <p className="text-sm text-muted-foreground">
-                  Abrir diálogo de impresión al guardar tickets
+                  Mostrar el nombre del taller en la parte superior
                 </p>
               </div>
               <Switch
-                id="autoPrint"
-                checked={autoPrint}
-                onCheckedChange={setAutoPrint}
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="printLabels">Imprimir etiquetas de accesorios</Label>
-                <p className="text-sm text-muted-foreground">
-                  Generar etiquetas pequeñas para cada accesorio
-                </p>
-              </div>
-              <Switch
-                id="printLabels"
-                checked={printLabels}
-                onCheckedChange={setPrintLabels}
+                id="printLogo"
+                checked={printLogo}
+                onCheckedChange={setPrintLogo}
               />
             </div>
           </CardContent>
@@ -162,37 +210,37 @@ export default function ConfiguracionPage() {
           <CardContent className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="lowStockAlert">Alerta de stock bajo</Label>
-                <p className="text-sm text-muted-foreground">
-                  Mostrar alerta cuando las piezas tengan stock bajo
-                </p>
-              </div>
-              <Switch
-                id="lowStockAlert"
-                checked={lowStockAlert}
-                onCheckedChange={setLowStockAlert}
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="readyAlert">Alerta de equipos listos</Label>
+                <Label htmlFor="notifyReady">Alerta de equipos listos</Label>
                 <p className="text-sm text-muted-foreground">
                   Mostrar alerta cuando hay equipos listos para entregar
                 </p>
               </div>
               <Switch
-                id="readyAlert"
-                checked={readyAlert}
-                onCheckedChange={setReadyAlert}
+                id="notifyReady"
+                checked={notifyReady}
+                onCheckedChange={setNotifyReady}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="notifyDelivered">Confirmación de entrega</Label>
+                <p className="text-sm text-muted-foreground">
+                  Pedir confirmación al marcar como entregado
+                </p>
+              </div>
+              <Switch
+                id="notifyDelivered"
+                checked={notifyDelivered}
+                onCheckedChange={setNotifyDelivered}
               />
             </div>
           </CardContent>
         </Card>
 
         {/* Save Button */}
-        <Button onClick={handleSave} size="lg" className="w-full">
-          <Save className="w-5 h-5 mr-2" />
+        <Button onClick={handleSave} size="lg" className="w-full" disabled={isSaving}>
+          {isSaving ? <Spinner className="w-5 h-5 mr-2" /> : <Save className="w-5 h-5 mr-2" />}
           Guardar Configuración
         </Button>
       </div>

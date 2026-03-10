@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { DashboardLayout } from '@/components/dashboard-layout'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -27,35 +27,44 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { getActiveTickets, updateTicketStatus } from '@/lib/store'
-import { Ticket, TicketStatus, STATUS_COLORS, ACCESSORY_LABELS, AccessoryKey } from '@/lib/types'
+import { Ticket, TicketStatus, STATUS_COLORS, STATUS_LABELS, EQUIPMENT_LABELS } from '@/lib/types'
 import { Search, Eye, Printer } from 'lucide-react'
 import { TicketReceipt } from '@/components/ticket-receipt'
+import { Spinner } from '@/components/ui/spinner'
+import useSWR, { mutate } from 'swr'
 
-const statusOptions: TicketStatus[] = ['Recibido', 'En Diagnóstico', 'En Reparación', 'Listo', 'Entregado']
+const fetcher = (url: string) => fetch(url).then(res => res.json())
+
+const statusOptions: TicketStatus[] = ['recibido', 'en_diagnostico', 'en_reparacion', 'listo', 'entregado']
 
 export default function TicketsActivosPage() {
-  const [tickets, setTickets] = useState<Ticket[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const [showPrint, setShowPrint] = useState(false)
 
-  useEffect(() => {
-    setTickets(getActiveTickets())
-  }, [])
-
-  const filteredTickets = tickets.filter(ticket =>
-    ticket.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ticket.ticketNumber.toString().includes(searchTerm) ||
-    ticket.serialNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ticket.phone.includes(searchTerm)
+  const { data: tickets = [], isLoading } = useSWR<Ticket[]>(
+    `/api/tickets?status=active&search=${encodeURIComponent(searchTerm)}`,
+    fetcher,
+    { refreshInterval: 10000 }
   )
 
-  const handleStatusChange = (ticketId: string, newStatus: TicketStatus) => {
-    updateTicketStatus(ticketId, newStatus)
-    setTickets(getActiveTickets())
-    if (selectedTicket?.id === ticketId) {
-      setSelectedTicket(prev => prev ? { ...prev, status: newStatus } : null)
+  const handleStatusChange = async (ticketId: string, newStatus: TicketStatus) => {
+    try {
+      await fetch(`/api/tickets/${ticketId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      })
+      
+      // Refresh the data
+      mutate(`/api/tickets?status=active&search=${encodeURIComponent(searchTerm)}`)
+      
+      if (selectedTicket?.id === ticketId) {
+        setSelectedTicket(prev => prev ? { ...prev, status: newStatus } : null)
+      }
+    } catch (error) {
+      console.error('Error updating status:', error)
+      alert('Error al actualizar el estado')
     }
   }
 
@@ -68,18 +77,12 @@ export default function TicketsActivosPage() {
     }, 100)
   }
 
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('es-MX', {
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('es-MX', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric'
     })
-  }
-
-  const getSelectedAccessories = (ticket: Ticket) => {
-    return (Object.keys(ACCESSORY_LABELS) as AccessoryKey[])
-      .filter(key => ticket.accessories[key])
-      .map(key => ACCESSORY_LABELS[key])
   }
 
   return (
@@ -109,7 +112,7 @@ export default function TicketsActivosPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-24">Ticket</TableHead>
+                    <TableHead className="w-28">Ticket</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead className="hidden sm:table-cell">Equipo</TableHead>
                     <TableHead className="hidden md:table-cell">Marca</TableHead>
@@ -121,29 +124,39 @@ export default function TicketsActivosPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredTickets.length === 0 ? (
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-8">
+                        <Spinner className="h-8 w-8 mx-auto" />
+                      </TableCell>
+                    </TableRow>
+                  ) : tickets.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                         No se encontraron tickets
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredTickets.map((ticket) => (
+                    tickets.map((ticket) => (
                       <TableRow key={ticket.id} className="cursor-pointer hover:bg-muted/50">
-                        <TableCell className="font-mono font-medium">
-                          #{String(ticket.ticketNumber).padStart(5, '0')}
+                        <TableCell className="font-mono font-medium text-xs">
+                          {ticket.id}
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p className="font-medium">{ticket.clientName}</p>
-                            <p className="text-sm text-muted-foreground sm:hidden">{ticket.equipmentType}</p>
+                            <p className="font-medium">{ticket.client_name}</p>
+                            <p className="text-sm text-muted-foreground sm:hidden">
+                              {EQUIPMENT_LABELS[ticket.equipment_type]}
+                            </p>
                           </div>
                         </TableCell>
-                        <TableCell className="hidden sm:table-cell">{ticket.equipmentType}</TableCell>
+                        <TableCell className="hidden sm:table-cell">
+                          {EQUIPMENT_LABELS[ticket.equipment_type]}
+                        </TableCell>
                         <TableCell className="hidden md:table-cell">{ticket.brand}</TableCell>
                         <TableCell className="hidden lg:table-cell">{ticket.model}</TableCell>
                         <TableCell className="hidden xl:table-cell max-w-48 truncate">
-                          {ticket.reportedProblem}
+                          {ticket.reported_issue}
                         </TableCell>
                         <TableCell>
                           <Select
@@ -152,14 +165,14 @@ export default function TicketsActivosPage() {
                           >
                             <SelectTrigger className="w-36 h-8">
                               <Badge className={`${STATUS_COLORS[ticket.status]} text-xs`}>
-                                {ticket.status}
+                                {STATUS_LABELS[ticket.status]}
                               </Badge>
                             </SelectTrigger>
                             <SelectContent>
                               {statusOptions.map((status) => (
                                 <SelectItem key={status} value={status}>
                                   <Badge className={`${STATUS_COLORS[status]} text-xs`}>
-                                    {status}
+                                    {STATUS_LABELS[status]}
                                   </Badge>
                                 </SelectItem>
                               ))}
@@ -167,7 +180,7 @@ export default function TicketsActivosPage() {
                           </Select>
                         </TableCell>
                         <TableCell className="hidden sm:table-cell text-muted-foreground">
-                          {formatDate(ticket.createdAt)}
+                          {formatDate(ticket.created_at)}
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
@@ -204,9 +217,9 @@ export default function TicketsActivosPage() {
             <>
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-3">
-                  <span className="font-mono">Ticket #{String(selectedTicket.ticketNumber).padStart(5, '0')}</span>
+                  <span className="font-mono text-sm">{selectedTicket.id}</span>
                   <Badge className={STATUS_COLORS[selectedTicket.status]}>
-                    {selectedTicket.status}
+                    {STATUS_LABELS[selectedTicket.status]}
                   </Badge>
                 </DialogTitle>
               </DialogHeader>
@@ -216,11 +229,11 @@ export default function TicketsActivosPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Cliente</p>
-                    <p className="font-medium">{selectedTicket.clientName}</p>
+                    <p className="font-medium">{selectedTicket.client_name}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Teléfono</p>
-                    <p className="font-medium">{selectedTicket.phone}</p>
+                    <p className="font-medium">{selectedTicket.client_phone}</p>
                   </div>
                 </div>
 
@@ -228,7 +241,7 @@ export default function TicketsActivosPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Tipo</p>
-                    <p className="font-medium">{selectedTicket.equipmentType}</p>
+                    <p className="font-medium">{EQUIPMENT_LABELS[selectedTicket.equipment_type]}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Marca</p>
@@ -240,21 +253,21 @@ export default function TicketsActivosPage() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Serie</p>
-                    <p className="font-medium">{selectedTicket.serialNumber || '-'}</p>
+                    <p className="font-medium">{selectedTicket.serial_number || '-'}</p>
                   </div>
                 </div>
 
                 {/* Problem */}
                 <div>
                   <p className="text-sm text-muted-foreground">Problema Reportado</p>
-                  <p className="font-medium">{selectedTicket.reportedProblem}</p>
+                  <p className="font-medium">{selectedTicket.reported_issue}</p>
                 </div>
 
                 {/* Internal Notes */}
-                {selectedTicket.internalNotes && (
+                {selectedTicket.notes && (
                   <div>
                     <p className="text-sm text-muted-foreground">Observaciones Internas</p>
-                    <p className="font-medium">{selectedTicket.internalNotes}</p>
+                    <p className="font-medium">{selectedTicket.notes}</p>
                   </div>
                 )}
 
@@ -262,8 +275,8 @@ export default function TicketsActivosPage() {
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Accesorios Recibidos</p>
                   <div className="flex flex-wrap gap-2">
-                    {getSelectedAccessories(selectedTicket).length > 0 ? (
-                      getSelectedAccessories(selectedTicket).map((acc) => (
+                    {selectedTicket.accessories.length > 0 ? (
+                      selectedTicket.accessories.map((acc) => (
                         <Badge key={acc} variant="secondary">{acc}</Badge>
                       ))
                     ) : (
@@ -283,7 +296,7 @@ export default function TicketsActivosPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {statusOptions.map((status) => (
-                        <SelectItem key={status} value={status}>{status}</SelectItem>
+                        <SelectItem key={status} value={status}>{STATUS_LABELS[status]}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

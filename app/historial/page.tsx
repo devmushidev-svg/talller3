@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { DashboardLayout } from '@/components/dashboard-layout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -20,28 +20,24 @@ import {
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { getCompletedTickets } from '@/lib/store'
-import { Ticket, ACCESSORY_LABELS, AccessoryKey } from '@/lib/types'
+import { Ticket, EQUIPMENT_LABELS } from '@/lib/types'
 import { Search, Eye } from 'lucide-react'
+import { Spinner } from '@/components/ui/spinner'
+import useSWR from 'swr'
+
+const fetcher = (url: string) => fetch(url).then(res => res.json())
 
 export default function HistorialPage() {
-  const [tickets, setTickets] = useState<Ticket[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
 
-  useEffect(() => {
-    setTickets(getCompletedTickets())
-  }, [])
-
-  const filteredTickets = tickets.filter(ticket =>
-    ticket.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ticket.ticketNumber.toString().includes(searchTerm) ||
-    ticket.serialNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ticket.phone.includes(searchTerm)
+  const { data: tickets = [], isLoading } = useSWR<Ticket[]>(
+    `/api/tickets?status=completed&search=${encodeURIComponent(searchTerm)}`,
+    fetcher
   )
 
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('es-MX', {
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('es-MX', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric'
@@ -53,12 +49,6 @@ export default function HistorialPage() {
       style: 'currency',
       currency: 'MXN'
     }).format(value)
-  }
-
-  const getSelectedAccessories = (ticket: Ticket) => {
-    return (Object.keys(ACCESSORY_LABELS) as AccessoryKey[])
-      .filter(key => ticket.accessories[key])
-      .map(key => ACCESSORY_LABELS[key])
   }
 
   return (
@@ -88,7 +78,7 @@ export default function HistorialPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-24">Ticket</TableHead>
+                    <TableHead className="w-28">Ticket</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead className="hidden sm:table-cell">Equipo</TableHead>
                     <TableHead className="hidden md:table-cell">Recepción</TableHead>
@@ -98,38 +88,46 @@ export default function HistorialPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredTickets.length === 0 ? (
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8">
+                        <Spinner className="h-8 w-8 mx-auto" />
+                      </TableCell>
+                    </TableRow>
+                  ) : tickets.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         No se encontraron tickets en el historial
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredTickets.map((ticket) => (
+                    tickets.map((ticket) => (
                       <TableRow key={ticket.id}>
-                        <TableCell className="font-mono font-medium">
-                          #{String(ticket.ticketNumber).padStart(5, '0')}
+                        <TableCell className="font-mono font-medium text-xs">
+                          {ticket.id}
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p className="font-medium">{ticket.clientName}</p>
-                            <p className="text-sm text-muted-foreground">{ticket.phone}</p>
+                            <p className="font-medium">{ticket.client_name}</p>
+                            <p className="text-sm text-muted-foreground">{ticket.client_phone}</p>
                           </div>
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">
                           <div>
                             <p>{ticket.brand} {ticket.model}</p>
-                            <p className="text-sm text-muted-foreground">{ticket.equipmentType}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {EQUIPMENT_LABELS[ticket.equipment_type]}
+                            </p>
                           </div>
                         </TableCell>
                         <TableCell className="hidden md:table-cell text-muted-foreground">
-                          {formatDate(ticket.createdAt)}
+                          {formatDate(ticket.created_at)}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-muted-foreground">
-                          {ticket.deliveredAt ? formatDate(ticket.deliveredAt) : '-'}
+                          {formatDate(ticket.updated_at)}
                         </TableCell>
                         <TableCell className="text-right font-medium">
-                          {ticket.totalRepair ? formatCurrency(ticket.totalRepair) : '-'}
+                          {ticket.final_cost ? formatCurrency(ticket.final_cost) : '-'}
                         </TableCell>
                         <TableCell>
                           <Button
@@ -157,7 +155,7 @@ export default function HistorialPage() {
             <>
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-3">
-                  <span className="font-mono">Ticket #{String(selectedTicket.ticketNumber).padStart(5, '0')}</span>
+                  <span className="font-mono text-sm">{selectedTicket.id}</span>
                   <Badge variant="secondary">Entregado</Badge>
                 </DialogTitle>
               </DialogHeader>
@@ -167,11 +165,11 @@ export default function HistorialPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Cliente</p>
-                    <p className="font-medium">{selectedTicket.clientName}</p>
+                    <p className="font-medium">{selectedTicket.client_name}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Teléfono</p>
-                    <p className="font-medium">{selectedTicket.phone}</p>
+                    <p className="font-medium">{selectedTicket.client_phone}</p>
                   </div>
                 </div>
 
@@ -179,7 +177,7 @@ export default function HistorialPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Tipo</p>
-                    <p className="font-medium">{selectedTicket.equipmentType}</p>
+                    <p className="font-medium">{EQUIPMENT_LABELS[selectedTicket.equipment_type]}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Marca</p>
@@ -191,7 +189,7 @@ export default function HistorialPage() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Serie</p>
-                    <p className="font-medium">{selectedTicket.serialNumber || '-'}</p>
+                    <p className="font-medium">{selectedTicket.serial_number || '-'}</p>
                   </div>
                 </div>
 
@@ -199,27 +197,33 @@ export default function HistorialPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Fecha de Recepción</p>
-                    <p className="font-medium">{formatDate(selectedTicket.createdAt)}</p>
+                    <p className="font-medium">{formatDate(selectedTicket.created_at)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Fecha de Entrega</p>
-                    <p className="font-medium">
-                      {selectedTicket.deliveredAt ? formatDate(selectedTicket.deliveredAt) : '-'}
-                    </p>
+                    <p className="font-medium">{formatDate(selectedTicket.updated_at)}</p>
                   </div>
                 </div>
 
                 {/* Problem */}
                 <div>
                   <p className="text-sm text-muted-foreground">Problema Reportado</p>
-                  <p className="font-medium">{selectedTicket.reportedProblem}</p>
+                  <p className="font-medium">{selectedTicket.reported_issue}</p>
                 </div>
 
-                {/* Internal Notes */}
-                {selectedTicket.internalNotes && (
+                {/* Diagnosis */}
+                {selectedTicket.diagnosis && (
                   <div>
-                    <p className="text-sm text-muted-foreground">Observaciones Internas</p>
-                    <p className="font-medium">{selectedTicket.internalNotes}</p>
+                    <p className="text-sm text-muted-foreground">Diagnóstico</p>
+                    <p className="font-medium">{selectedTicket.diagnosis}</p>
+                  </div>
+                )}
+
+                {/* Solution */}
+                {selectedTicket.solution && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Solución Aplicada</p>
+                    <p className="font-medium">{selectedTicket.solution}</p>
                   </div>
                 )}
 
@@ -227,8 +231,8 @@ export default function HistorialPage() {
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Accesorios Recibidos</p>
                   <div className="flex flex-wrap gap-2">
-                    {getSelectedAccessories(selectedTicket).length > 0 ? (
-                      getSelectedAccessories(selectedTicket).map((acc) => (
+                    {selectedTicket.accessories.length > 0 ? (
+                      selectedTicket.accessories.map((acc) => (
                         <Badge key={acc} variant="secondary">{acc}</Badge>
                       ))
                     ) : (
@@ -238,11 +242,11 @@ export default function HistorialPage() {
                 </div>
 
                 {/* Total */}
-                {selectedTicket.totalRepair && (
+                {selectedTicket.final_cost && (
                   <div className="pt-4 border-t">
                     <p className="text-sm text-muted-foreground">Total de Reparación</p>
                     <p className="text-2xl font-bold text-primary">
-                      {formatCurrency(selectedTicket.totalRepair)}
+                      {formatCurrency(selectedTicket.final_cost)}
                     </p>
                   </div>
                 )}
