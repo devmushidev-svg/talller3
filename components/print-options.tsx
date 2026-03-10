@@ -144,15 +144,14 @@ export function PrintOptions({ ticket, open, onOpenChange }: PrintOptionsProps) 
             </Card>
           )}
 
-          {/* Quick Actions */}
-          <div className="flex gap-2 pt-2 border-t">
+          {/* Close Button */}
+          <div className="pt-4 border-t">
             <Button 
               variant="outline" 
-              className="flex-1"
+              className="w-full h-12"
               onClick={() => onOpenChange?.(false)}
             >
-              <X className="mr-2 h-4 w-4" />
-              Cerrar
+              Cerrar Opciones de Impresión
             </Button>
           </div>
         </div>

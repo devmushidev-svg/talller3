@@ -175,10 +175,11 @@ export default function NuevoTicketPage() {
 
   const handlePrintDialogClose = (open: boolean) => {
     setShowPrintDialog(open)
-    if (!open && savedTicket) {
-      // Reset form when closing print dialog
-      resetForm()
-    }
+    // No reset form here - user can close and reopen or create new ticket manually
+  }
+
+  const handleNewTicket = () => {
+    resetForm()
   }
 
   return (
@@ -392,35 +393,67 @@ export default function NuevoTicketPage() {
           </Card>
 
           {/* Action Buttons */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Button
-              onClick={() => handleSave(false)}
-              size="lg"
-              variant="secondary"
-              className="h-14 text-base"
-              disabled={saving}
-            >
-              {saving ? (
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-5 w-5" />
-              )}
-              Solo Guardar
-            </Button>
-            <Button
-              onClick={() => handleSave(true)}
-              size="lg"
-              className="h-14 text-base"
-              disabled={saving}
-            >
-              {saving ? (
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              ) : (
-                <Printer className="mr-2 h-5 w-5" />
-              )}
-              Guardar e Imprimir
-            </Button>
-          </div>
+          {!savedTicket ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Button
+                onClick={() => handleSave(false)}
+                size="lg"
+                variant="outline"
+                className="h-14 text-base"
+                disabled={saving}
+              >
+                {saving ? (
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-5 w-5" />
+                )}
+                Solo Guardar
+              </Button>
+              <Button
+                onClick={() => handleSave(true)}
+                size="lg"
+                className="h-14 text-base bg-primary hover:bg-primary/90"
+                disabled={saving}
+              >
+                {saving ? (
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                ) : (
+                  <Printer className="mr-2 h-5 w-5" />
+                )}
+                Guardar e Imprimir
+              </Button>
+            </div>
+          ) : (
+            <Card className="border-green-500 bg-green-50 dark:bg-green-950">
+              <CardContent className="pt-6">
+                <div className="text-center space-y-4">
+                  <div className="flex items-center justify-center gap-2 text-green-700 dark:text-green-400">
+                    <Save className="h-6 w-6" />
+                    <span className="text-lg font-semibold">Ticket {savedTicket.id} guardado</span>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Button
+                      onClick={() => setShowPrintDialog(true)}
+                      size="lg"
+                      className="h-14 text-base"
+                    >
+                      <Printer className="mr-2 h-5 w-5" />
+                      Imprimir Ticket
+                    </Button>
+                    <Button
+                      onClick={handleNewTicket}
+                      size="lg"
+                      variant="outline"
+                      className="h-14 text-base"
+                    >
+                      <FileText className="mr-2 h-5 w-5" />
+                      Nuevo Ticket
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 
