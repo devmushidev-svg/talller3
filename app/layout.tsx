@@ -6,8 +6,8 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Sistema de Tickets de Taller',
-  description: 'Sistema de gestión de tickets para taller de reparación de impresoras y computadoras',
+  title: 'Multiplanet - Sistema de Tickets',
+  description: 'Sistema de gestión de tickets para Multiplanet - Reparación de impresoras y computadoras',
   generator: 'v0.app',
   icons: {
     icon: [
