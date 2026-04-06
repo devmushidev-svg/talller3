@@ -146,9 +146,12 @@ export default function DashboardPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Panel de Control</h1>
-          <p className="text-muted-foreground">Resumen del taller</p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Panel de Control</h1>
+            <p className="text-muted-foreground">Resumen del taller</p>
+          </div>
+          <Badge className="w-fit">Prueba Git</Badge>
         </div>
 
         {/* Today's Stats */}
