@@ -29,6 +29,14 @@ import { CustomerHistory } from "@/components/customer-history"
 import { PrintCustomer } from "@/components/print-customer"
 import { PrintInternal } from "@/components/print-internal"
 
+/** Valor para <input type="date"> en hora local (evita desfase UTC). */
+function getLocalDateInputValue(date = new Date()) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
 export default function NuevoTicketPage() {
   const [clientName, setClientName] = useState("")
   const [clientPhone, setClientPhone] = useState("")
@@ -40,8 +48,10 @@ export default function NuevoTicketPage() {
   const [accessories, setAccessories] = useState<string[]>([])
   const [otherAccessoryInput, setOtherAccessoryInput] = useState("")
   
-  // New fields
-  const [estimatedDeliveryDate, setEstimatedDeliveryDate] = useState("")
+  // New fields — entrega estimada: hoy por defecto
+  const [estimatedDeliveryDate, setEstimatedDeliveryDate] = useState(
+    () => getLocalDateInputValue()
+  )
   const [diagnosisCost, setDiagnosisCost] = useState("")
   const [internalNotes, setInternalNotes] = useState("")
   const [photos, setPhotos] = useState<string[]>([])
@@ -93,18 +103,10 @@ export default function NuevoTicketPage() {
     })
   }
 
-  const formatAccessoryDate = (d: Date) =>
-    d.toLocaleDateString("es-HN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    })
-
   const handleAddOtherAccessory = () => {
     const text = otherAccessoryInput.trim()
     if (!text) return
-    const dated = `${text} (${formatAccessoryDate(new Date())})`
-    setAccessories((prev) => [...prev, dated])
+    setAccessories((prev) => [...prev, text])
     setOtherAccessoryInput("")
   }
 
@@ -122,7 +124,7 @@ export default function NuevoTicketPage() {
     setProblemDescription("")
     setAccessories([])
     setOtherAccessoryInput("")
-    setEstimatedDeliveryDate("")
+    setEstimatedDeliveryDate(getLocalDateInputValue())
     setDiagnosisCost("")
     setInternalNotes("")
     setPhotos([])
@@ -374,7 +376,7 @@ export default function NuevoTicketPage() {
               <div className="mt-6 space-y-3 border-t border-border pt-4">
                 <Label>Otro accesorio o detalle</Label>
                 <p className="text-xs text-muted-foreground">
-                  Se guarda con la fecha de hoy. Puede añadir varios.
+                  Puede añadir varios accesorios o detalles.
                 </p>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <Input
@@ -440,13 +442,16 @@ export default function NuevoTicketPage() {
                     <Calendar className="h-4 w-4" />
                     Fecha Estimada de Entrega
                   </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Por defecto es hoy; cámbiela si la entrega será otro día.
+                  </p>
                   <Input
                     id="estimatedDelivery"
                     type="date"
                     value={estimatedDeliveryDate}
                     onChange={(e) => setEstimatedDeliveryDate(e.target.value)}
                     className="h-12"
-                    min={new Date().toISOString().split('T')[0]}
+                    min={getLocalDateInputValue()}
                   />
                 </div>
                 <div className="space-y-2">
