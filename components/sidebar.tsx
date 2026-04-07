@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button'
 import { useState } from 'react'
 
 const navItems = [
-  { href: '/', label: 'Panel de Control', icon: LayoutDashboard },
+  { href: '/', label: 'Inicio', icon: LayoutDashboard },
   { href: '/nuevo-ticket', label: 'Nuevo Ticket', icon: PlusCircle },
   { href: '/tickets-activos', label: 'Tickets Activos', icon: ClipboardList },
   { href: '/inventario', label: 'Inventario de Piezas', icon: Package },

@@ -15,16 +15,24 @@ export async function GET(request: Request) {
     
     let dbQuery = supabase.from('tickets').select('*')
     
-    // Text search across multiple fields
+    // Text search + número de ticket impreso (ticket_seq), p. ej. "4" en "Ticket N° 4"
     if (query) {
-      dbQuery = dbQuery.or(
-        `id.ilike.%${query}%,` +
-        `client_name.ilike.%${query}%,` +
-        `client_phone.ilike.%${query}%,` +
-        `serial_number.ilike.%${query}%,` +
-        `brand.ilike.%${query}%,` +
-        `model.ilike.%${query}%`
-      )
+      const q = query.trim()
+      const orParts = [
+        `id.ilike.%${q}%`,
+        `client_name.ilike.%${q}%`,
+        `client_phone.ilike.%${q}%`,
+        `serial_number.ilike.%${q}%`,
+        `brand.ilike.%${q}%`,
+        `model.ilike.%${q}%`,
+      ]
+      if (/^\d+$/.test(q)) {
+        const n = parseInt(q, 10)
+        if (Number.isSafeInteger(n)) {
+          orParts.push(`ticket_seq.eq.${n}`)
+        }
+      }
+      dbQuery = dbQuery.or(orParts.join(","))
     }
     
     // Status filter

@@ -57,11 +57,18 @@ export default function HistorialPage() {
   }, [])
 
   const filteredTickets = tickets.filter((ticket) => {
-    const search = searchTerm.toLowerCase()
+    const raw = searchTerm.trim()
+    if (!raw) return true
+    const search = raw.toLowerCase()
+    if (/^\d+$/.test(raw)) {
+      const n = parseInt(raw, 10)
+      if (!Number.isNaN(n) && ticket.ticket_seq === n) return true
+    }
     return (
       ticket.client_name.toLowerCase().includes(search) ||
       ticket.client_phone.includes(search) ||
-      (ticket.serial_number?.toLowerCase().includes(search) ?? false)
+      (ticket.serial_number?.toLowerCase().includes(search) ?? false) ||
+      ticket.id.toLowerCase().includes(search)
     )
   })
 

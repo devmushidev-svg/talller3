@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Card, CardContent } from "@/components/ui/card"
@@ -241,17 +241,32 @@ export default function TicketsActivosPage() {
     }
   }
 
-  const openTicketDetail = (ticket: Ticket) => {
+  const openTicketDetail = useCallback((ticket: Ticket) => {
     setSelectedTicket(ticket)
     setEditClientName(ticket.client_name)
     setEditClientPhone(ticket.client_phone)
-    setEditDiagnosis(ticket.diagnosis || '')
-    setEditRepairNotes(ticket.repair_notes || '')
-    setEditLaborCost(ticket.labor_cost?.toString() || '0')
-    setEditPartsCost(ticket.parts_cost?.toString() || '0')
-    setEditAmountPaid(ticket.amount_paid?.toString() || '0')
+    setEditDiagnosis(ticket.diagnosis || "")
+    setEditRepairNotes(ticket.repair_notes || "")
+    setEditLaborCost(ticket.labor_cost?.toString() || "0")
+    setEditPartsCost(ticket.parts_cost?.toString() || "0")
+    setEditAmountPaid(ticket.amount_paid?.toString() || "0")
     setEditMode(false)
-  }
+  }, [])
+
+  /** Enlace desde inicio: /tickets-activos?ticketId=… abre el detalle y limpia la URL. */
+  useEffect(() => {
+    if (loading || tickets.length === 0 || typeof window === "undefined") return
+    const id = new URLSearchParams(window.location.search).get("ticketId")
+    if (!id) return
+    const t = tickets.find((x) => x.id === id)
+    if (!t) return
+    if (selectedTicket?.id === id) {
+      router.replace("/tickets-activos", { scroll: false })
+      return
+    }
+    openTicketDetail(t)
+    router.replace("/tickets-activos", { scroll: false })
+  }, [tickets, loading, router, openTicketDetail, selectedTicket?.id])
 
   const handleCustomerPrint = (ticket: Ticket) => {
     setPrintTicket(ticket)
@@ -314,7 +329,7 @@ export default function TicketsActivosPage() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar por cliente, ticket, serie, marca..."
+                  placeholder="Cliente, N° ticket (ej. 4), ID, teléfono, marca..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"

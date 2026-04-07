@@ -82,8 +82,8 @@ export default function NuevoTicketPage() {
   const focusKbField = useCallback((index: number) => {
     const refs = [
       kbReceivedByRef,
-      kbClientNameRef,
       kbClientPhoneRef,
+      kbClientNameRef,
       kbEquipmentTriggerRef,
       kbBrandRef,
       kbModelRef,
@@ -226,7 +226,7 @@ export default function NuevoTicketPage() {
 
   const handleSave = async (openPrintDialog: boolean = false) => {
     if (!clientName || !clientPhone || !problemDescription) {
-      alert("Por favor complete los campos obligatorios: Nombre, Teléfono y Problema")
+      alert("Por favor complete los campos obligatorios: Teléfono, Nombre y Problema")
       return
     }
 
@@ -353,18 +353,6 @@ export default function NuevoTicketPage() {
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="clientName">Nombre del Cliente *</Label>
-                  <Input
-                    ref={kbClientNameRef}
-                    id="clientName"
-                    value={clientName}
-                    onChange={(e) => setClientName(e.target.value)}
-                    placeholder="Nombre completo"
-                    className="h-12 text-lg"
-                    onKeyDown={(e) => onTicketFieldChainKeyDown(e, 1)}
-                  />
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="clientPhone">Teléfono *</Label>
                   <Input
                     ref={kbClientPhoneRef}
@@ -374,6 +362,18 @@ export default function NuevoTicketPage() {
                     placeholder="9999-9999"
                     className="h-12 text-lg"
                     type="tel"
+                    onKeyDown={(e) => onTicketFieldChainKeyDown(e, 1)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="clientName">Nombre del Cliente *</Label>
+                  <Input
+                    ref={kbClientNameRef}
+                    id="clientName"
+                    value={clientName}
+                    onChange={(e) => setClientName(e.target.value)}
+                    placeholder="Nombre completo"
+                    className="h-12 text-lg"
                     onKeyDown={(e) => onTicketFieldChainKeyDown(e, 2)}
                   />
                 </div>
