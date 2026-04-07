@@ -135,12 +135,12 @@ export default function NuevoTicketPage() {
         focusKbField(index - 1)
       }
 
-      if (e.key === "ArrowDown") {
+      if (e.key === "ArrowDown" || e.key === "ArrowRight") {
         if (index === 3 && equipmentSelectOpen) return
         goNext()
         return
       }
-      if (e.key === "ArrowUp") {
+      if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
         if (index === 3 && equipmentSelectOpen) return
         goPrev()
         return
@@ -316,6 +316,8 @@ export default function NuevoTicketPage() {
             <p className="mt-2 text-sm text-muted-foreground">
               <kbd className="rounded border bg-muted px-1.5 py-0.5 text-xs">↑</kbd>{" "}
               <kbd className="rounded border bg-muted px-1.5 py-0.5 text-xs">↓</kbd>{" "}
+              <kbd className="rounded border bg-muted px-1.5 py-0.5 text-xs">←</kbd>{" "}
+              <kbd className="rounded border bg-muted px-1.5 py-0.5 text-xs">→</kbd>{" "}
               <kbd className="rounded border bg-muted px-1.5 py-0.5 text-xs">Enter</kbd>{" "}
               para moverse entre campos hasta <strong className="text-foreground">Problema</strong>.
               En <strong className="text-foreground">Accesorios</strong> use el ratón (y el botón
