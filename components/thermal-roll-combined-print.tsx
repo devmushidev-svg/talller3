@@ -336,8 +336,12 @@ export const ThermalRollCombinedPrint = forwardRef<ThermalRollCombinedHandle, Pr
           .cust-disclaimer { font-size: 7px; text-align: center; margin-top: 3mm; padding-top: 2mm; border-top: 1px solid #000; font-weight: bold; }
       `
 
-      const printDelayMs = 280
-      const afterPrintMs = 1300
+      // No encadenar con setTimeout corto: el siguiente print() se disparaba mientras el cuadro
+      // anterior seguía abierto y el sistema/navegador lo trataba como UN solo trabajo largo.
+      // afterprint = el usuario cerró o imprimió; ahí sí abrimos el siguiente bloque.
+      const printDelayMs = 320
+      /** Si afterprint no existe o falla, no dejar la promesa colgada */
+      const afterPrintFallbackMs = 120_000
 
       const runOnePrintJob = (bodyHtml: string, jobIndex: number) =>
         new Promise<void>((resolve) => {
@@ -352,7 +356,8 @@ export const ThermalRollCombinedPrint = forwardRef<ThermalRollCombinedHandle, Pr
           document.body.appendChild(iframe)
 
           const doc = iframe.contentDocument || iframe.contentWindow?.document
-          if (!doc) {
+          const win = iframe.contentWindow
+          if (!doc || !win) {
             iframe.remove()
             resolve()
             return
@@ -361,17 +366,41 @@ export const ThermalRollCombinedPrint = forwardRef<ThermalRollCombinedHandle, Pr
           doc.write(html)
           doc.close()
 
+          let settled = false
+          const finish = () => {
+            if (settled) return
+            settled = true
+            window.clearTimeout(fallbackTimer)
+            try {
+              win.removeEventListener("afterprint", onAfterPrint)
+            } catch {
+              /* no-op */
+            }
+            iframe.remove()
+            resolve()
+          }
+
+          const onAfterPrint = () => {
+            finish()
+          }
+
+          const fallbackTimer = window.setTimeout(() => {
+            console.warn(
+              "[thermal] afterprint no recibido; pasando a la siguiente pieza. Cierra el cuadro de impresión manualmente entre tickets si se superponen."
+            )
+            finish()
+          }, afterPrintFallbackMs)
+
+          win.addEventListener("afterprint", onAfterPrint)
+
           window.setTimeout(() => {
             try {
-              iframe.contentWindow?.focus()
-              iframe.contentWindow?.print()
+                win.focus()
+                win.print()
             } catch (e) {
               console.error("Print error:", e)
+              finish()
             }
-            window.setTimeout(() => {
-              iframe.remove()
-              resolve()
-            }, afterPrintMs)
           }, printDelayMs)
         })
 
