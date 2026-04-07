@@ -21,6 +21,8 @@ export interface Ticket {
   brand?: string | null
   model?: string | null
   serial_number?: string | null
+  /** Contraseña de acceso al equipo (Windows, BIOS, etc.) */
+  device_password?: string | null
   problem_description: string
   diagnosis?: string | null
   repair_notes?: string | null
@@ -121,18 +123,33 @@ export const EQUIPMENT_LABELS: Record<EquipmentType, string> = {
   otro: 'Otro'
 }
 
-export const ACCESSORY_OPTIONS = [
+/** Checkboxes en nuevo ticket e impresión orden de trabajo */
+export const ACCESSORY_CHECKBOX_LABELS = [
   'Cable de poder',
   'Cable USB',
   'Cargador',
   'Mouse',
   'Teclado',
-  'Funda/Bolsa',
-  'Control remoto',
-  'Tóner/Cartuchos',
-  'Disco duro externo',
-  'Memoria USB'
-]
+  'Funda',
+] as const
+
+export type AccessoryCheckboxLabel = (typeof ACCESSORY_CHECKBOX_LABELS)[number]
+
+/** Coincide texto guardado con una opción estándar (incluye tickets viejos con Funda/Bolsa) */
+export function accessoryMatchesCheckbox(
+  stored: string,
+  checkboxLabel: string
+): boolean {
+  if (stored === checkboxLabel) return true
+  if (checkboxLabel === 'Funda' && stored === 'Funda/Bolsa') return true
+  return false
+}
+
+export function isStandardAccessoryStored(stored: string): boolean {
+  return ACCESSORY_CHECKBOX_LABELS.some((label) =>
+    accessoryMatchesCheckbox(stored, label)
+  )
+}
 
 export const PART_CATEGORIES = [
   'Pantallas',

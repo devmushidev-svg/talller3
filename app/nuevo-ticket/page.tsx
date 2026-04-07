@@ -19,9 +19,11 @@ import {
   Ticket,
   EquipmentType,
   EQUIPMENT_LABELS,
-  ACCESSORY_OPTIONS,
+  ACCESSORY_CHECKBOX_LABELS,
+  accessoryMatchesCheckbox,
+  isStandardAccessoryStored,
 } from "@/lib/types"
-import { Save, Printer, Loader2, Calendar, DollarSign, FileText } from "lucide-react"
+import { Save, Printer, Loader2, Calendar, DollarSign, FileText, Plus, X } from "lucide-react"
 import { PhotoUpload } from "@/components/photo-upload"
 import { CustomerHistory } from "@/components/customer-history"
 import { PrintCustomer } from "@/components/print-customer"
@@ -33,9 +35,10 @@ export default function NuevoTicketPage() {
   const [equipmentType, setEquipmentType] = useState<EquipmentType>("computadora")
   const [brand, setBrand] = useState("")
   const [model, setModel] = useState("")
-  const [serialNumber, setSerialNumber] = useState("")
+  const [devicePassword, setDevicePassword] = useState("")
   const [problemDescription, setProblemDescription] = useState("")
   const [accessories, setAccessories] = useState<string[]>([])
+  const [otherAccessoryInput, setOtherAccessoryInput] = useState("")
   
   // New fields
   const [estimatedDeliveryDate, setEstimatedDeliveryDate] = useState("")
@@ -80,12 +83,33 @@ export default function NuevoTicketPage() {
     return () => clearTimeout(debounce)
   }, [clientPhone, clientName])
 
-  const handleAccessoryChange = (accessory: string, checked: boolean) => {
-    if (checked) {
-      setAccessories((prev) => [...prev, accessory])
-    } else {
-      setAccessories((prev) => prev.filter((a) => a !== accessory))
-    }
+  const handleAccessoryChange = (checkboxLabel: string, checked: boolean) => {
+    setAccessories((prev) => {
+      if (checked) {
+        if (prev.some((a) => accessoryMatchesCheckbox(a, checkboxLabel))) return prev
+        return [...prev, checkboxLabel]
+      }
+      return prev.filter((a) => !accessoryMatchesCheckbox(a, checkboxLabel))
+    })
+  }
+
+  const formatAccessoryDate = (d: Date) =>
+    d.toLocaleDateString("es-HN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    })
+
+  const handleAddOtherAccessory = () => {
+    const text = otherAccessoryInput.trim()
+    if (!text) return
+    const dated = `${text} (${formatAccessoryDate(new Date())})`
+    setAccessories((prev) => [...prev, dated])
+    setOtherAccessoryInput("")
+  }
+
+  const removeAccessory = (item: string) => {
+    setAccessories((prev) => prev.filter((a) => a !== item))
   }
 
   const resetForm = () => {
@@ -94,9 +118,10 @@ export default function NuevoTicketPage() {
     setEquipmentType("computadora")
     setBrand("")
     setModel("")
-    setSerialNumber("")
+    setDevicePassword("")
     setProblemDescription("")
     setAccessories([])
+    setOtherAccessoryInput("")
     setEstimatedDeliveryDate("")
     setDiagnosisCost("")
     setInternalNotes("")
@@ -116,8 +141,7 @@ export default function NuevoTicketPage() {
     setSaving(true)
 
     try {
-      // Save or update customer
-      await fetch("/api/customers", {
+      const customerRes = await fetch("/api/customers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -125,6 +149,12 @@ export default function NuevoTicketPage() {
           phone: clientPhone,
         }),
       })
+      if (!customerRes.ok) {
+        const errBody = await customerRes.json().catch(() => ({}))
+        throw new Error(
+          typeof errBody.error === "string" ? errBody.error : "Error al guardar el cliente"
+        )
+      }
 
       // Create ticket
       const response = await fetch("/api/tickets", {
@@ -136,7 +166,8 @@ export default function NuevoTicketPage() {
           equipment_type: equipmentType,
           brand: brand || null,
           model: model || null,
-          serial_number: serialNumber || null,
+          serial_number: null,
+          device_password: devicePassword.trim() || null,
           problem_description: problemDescription,
           accessories,
           estimated_delivery_date: estimatedDeliveryDate || null,
@@ -236,7 +267,7 @@ export default function NuevoTicketPage() {
               <CardTitle className="text-lg">Datos del Equipo</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="equipmentType">Tipo de Equipo</Label>
                   <Select
@@ -277,16 +308,22 @@ export default function NuevoTicketPage() {
                     className="h-12 text-base"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="serialNumber">Número de Serie</Label>
-                  <Input
-                    id="serialNumber"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                    placeholder="S/N"
-                    className="h-12 text-base"
-                  />
-                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="devicePassword">Contraseña del equipo</Label>
+                <Input
+                  id="devicePassword"
+                  type="password"
+                  autoComplete="new-password"
+                  value={devicePassword}
+                  onChange={(e) => setDevicePassword(e.target.value)}
+                  placeholder="Windows, PIN, BIOS… (opcional)"
+                  className="h-12 text-base font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Opcional. Queda en el expediente del ticket y en las impresiones del taller.
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -316,12 +353,14 @@ export default function NuevoTicketPage() {
               <CardTitle className="text-lg">Accesorios Recibidos</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-                {ACCESSORY_OPTIONS.map((accessory) => (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-3">
+                {ACCESSORY_CHECKBOX_LABELS.map((accessory) => (
                   <div key={accessory} className="flex items-center space-x-2">
                     <Checkbox
                       id={accessory}
-                      checked={accessories.includes(accessory)}
+                      checked={accessories.some((a) =>
+                        accessoryMatchesCheckbox(a, accessory)
+                      )}
                       onCheckedChange={(checked) =>
                         handleAccessoryChange(accessory, checked as boolean)
                       }
@@ -331,6 +370,60 @@ export default function NuevoTicketPage() {
                     </Label>
                   </div>
                 ))}
+              </div>
+              <div className="mt-6 space-y-3 border-t border-border pt-4">
+                <Label>Otro accesorio o detalle</Label>
+                <p className="text-xs text-muted-foreground">
+                  Se guarda con la fecha de hoy. Puede añadir varios.
+                </p>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    value={otherAccessoryInput}
+                    onChange={(e) => setOtherAccessoryInput(e.target.value)}
+                    placeholder="Ej. Disco externo, control…"
+                    className="sm:flex-1"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault()
+                        handleAddOtherAccessory()
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="shrink-0"
+                    onClick={handleAddOtherAccessory}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Añadir
+                  </Button>
+                </div>
+                {accessories.filter(isStandardAccessoryStored).length <
+                  accessories.length && (
+                  <ul className="space-y-2 text-sm">
+                    {accessories
+                      .filter((a) => !isStandardAccessoryStored(a))
+                      .map((item) => (
+                        <li
+                          key={item}
+                          className="flex items-start justify-between gap-2 rounded-md bg-muted px-3 py-2"
+                        >
+                          <span>{item}</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0"
+                            onClick={() => removeAccessory(item)}
+                            aria-label="Quitar"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </li>
+                      ))}
+                  </ul>
+                )}
               </div>
             </CardContent>
           </Card>

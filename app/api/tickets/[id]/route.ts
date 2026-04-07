@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { upsertCustomerByPhone } from "@/lib/customers"
+import { normalizeCustomerPhone } from "@/lib/utils"
 
 export async function GET(
   request: Request,
@@ -33,6 +35,13 @@ export async function PATCH(
     ...body,
     updated_at: new Date().toISOString(),
   }
+
+  if (typeof body.client_phone === "string") {
+    updateData.client_phone = normalizeCustomerPhone(body.client_phone)
+  }
+  if (typeof body.client_name === "string") {
+    updateData.client_name = body.client_name.trim()
+  }
   
   if (body.status === "entregado" && !body.delivered_at) {
     updateData.delivered_at = new Date().toISOString()
@@ -55,6 +64,16 @@ export async function PATCH(
   
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  if (data?.client_name && data?.client_phone) {
+    const synced = await upsertCustomerByPhone(supabase, {
+      name: data.client_name,
+      phone: data.client_phone,
+    })
+    if (!synced.ok) {
+      console.error("Cliente no sincronizado tras guardar ticket:", synced.message)
+    }
   }
   
   return NextResponse.json(data)

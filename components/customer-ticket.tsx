@@ -1,7 +1,13 @@
 "use client"
 
 import { useRef } from "react"
-import { Ticket, ShopSettings } from "@/lib/types"
+import {
+  Ticket,
+  ShopSettings,
+  ACCESSORY_CHECKBOX_LABELS,
+  accessoryMatchesCheckbox,
+  isStandardAccessoryStored,
+} from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Printer } from "lucide-react"
 
@@ -236,9 +242,9 @@ export function CustomerTicket({ ticket, settings, onPrint }: CustomerTicketProp
   const month = (createdDate.getMonth() + 1).toString().padStart(2, '0')
   const year = createdDate.getFullYear().toString().slice(-2)
 
-  const allAccessories = [
-    'Cargador', 'Cable USB', 'Cable Energía', 'Maletín', 'Monitor', 'CPU', 'Mouse', 'Teclado'
-  ]
+  const customAccessoriesText = accessories
+    .filter((a: string) => !isStandardAccessoryStored(a))
+    .join(', ')
 
   return (
     <div className="space-y-4">
@@ -333,21 +339,31 @@ export function CustomerTicket({ ticket, settings, onPrint }: CustomerTicketProp
             <span className="field-label">Modelo:</span>
             <span className="field-value">{ticket.model || ''}</span>
           </div>
+          {ticket.device_password && (
+            <div className="field-row">
+              <span className="field-label">Contraseña:</span>
+              <span className="field-value" style={{ fontFamily: 'monospace' }}>{ticket.device_password}</span>
+            </div>
+          )}
 
           {/* Accessories */}
           <div className="checkbox-row">
-            {allAccessories.slice(0, 6).map(acc => (
+            {ACCESSORY_CHECKBOX_LABELS.map((acc) => (
               <div key={acc} className="checkbox-item">
-                <span className={`checkbox ${accessories.includes(acc) ? 'checked' : ''}`}></span>
+                <span
+                  className={`checkbox ${
+                    accessories.some((a: string) => accessoryMatchesCheckbox(a, acc))
+                      ? 'checked'
+                      : ''
+                  }`}
+                ></span>
                 <span>{acc}</span>
               </div>
             ))}
           </div>
           <div className="field-row">
             <span className="field-label">Otro:</span>
-            <span className="field-value">
-              {accessories.filter((a: string) => !allAccessories.slice(0, 6).includes(a)).join(', ')}
-            </span>
+            <span className="field-value">{customAccessoriesText}</span>
           </div>
 
           {/* Work Description */}

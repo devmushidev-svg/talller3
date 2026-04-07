@@ -1,11 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { upsertCustomerByPhone } from '@/lib/customers'
+import { normalizeCustomerPhone } from '@/lib/utils'
 
 export async function GET(request: Request) {
   try {
     const supabase = await createClient()
     const { searchParams } = new URL(request.url)
-    const phone = searchParams.get('phone')
+    const phoneRaw = searchParams.get('phone')
+    const phone = phoneRaw ? normalizeCustomerPhone(phoneRaw) : null
     const search = searchParams.get('search')
 
     let query = supabase.from('customers').select('*')
@@ -32,45 +35,28 @@ export async function POST(request: Request) {
     const supabase = await createClient()
     const body = await request.json()
 
-    // Check if customer already exists
-    const { data: existing } = await supabase
-      .from('customers')
-      .select('*')
-      .eq('phone', body.phone)
-      .single()
+    const result = await upsertCustomerByPhone(supabase, {
+      name: body.name,
+      phone: body.phone,
+      email: body.email,
+      address: body.address,
+    })
 
-    if (existing) {
-      // Update existing customer
-      const { data, error } = await supabase
-        .from('customers')
-        .update({
-          name: body.name,
-          email: body.email,
-          address: body.address,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existing.id)
-        .select()
-        .single()
-
-      if (error) throw error
-      return NextResponse.json(data)
+    if (!result.ok) {
+      return NextResponse.json({ error: result.message }, { status: 400 })
     }
 
-    // Create new customer
+    const phone = normalizeCustomerPhone(body.phone)
     const { data, error } = await supabase
       .from('customers')
-      .insert({
-        id: crypto.randomUUID(),
-        name: body.name,
-        phone: body.phone,
-        email: body.email,
-        address: body.address
-      })
-      .select()
-      .single()
+      .select('*')
+      .eq('phone', phone)
+      .maybeSingle()
 
     if (error) throw error
+    if (!data) {
+      return NextResponse.json({ error: 'Cliente no encontrado tras guardar' }, { status: 500 })
+    }
 
     return NextResponse.json(data)
   } catch (error) {

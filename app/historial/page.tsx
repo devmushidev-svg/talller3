@@ -242,6 +242,12 @@ export default function HistorialPage() {
                     </p>
                   </div>
                 </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Contraseña del equipo</p>
+                  <p className="font-medium font-mono">
+                    {selectedTicket.device_password?.trim() || "—"}
+                  </p>
+                </div>
 
                 {/* Dates */}
                 <div className="grid grid-cols-2 gap-4">

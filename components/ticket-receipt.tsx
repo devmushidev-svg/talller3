@@ -232,6 +232,9 @@ export function TicketReceipt({ ticket, settings, onPrint }: TicketReceiptProps)
           {ticket.brand && <div className="row"><span className="label">Marca:</span> {ticket.brand}</div>}
           {ticket.model && <div className="row"><span className="label">Modelo:</span> {ticket.model}</div>}
           {ticket.serial_number && <div className="row"><span className="label">S/N:</span> {ticket.serial_number}</div>}
+          {ticket.device_password && (
+            <div className="row"><span className="label">Contraseña:</span> {ticket.device_password}</div>
+          )}
 
           <div className="divider"></div>
 

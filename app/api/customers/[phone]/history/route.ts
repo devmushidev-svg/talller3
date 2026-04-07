@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { normalizeCustomerPhone } from '@/lib/utils'
 
 export async function GET(
   request: Request,
@@ -7,7 +8,8 @@ export async function GET(
 ) {
   try {
     const supabase = await createClient()
-    const { phone } = await params
+    const { phone: phoneParam } = await params
+    const phone = normalizeCustomerPhone(decodeURIComponent(phoneParam))
 
     // Get all tickets for this phone number
     const { data, error } = await supabase

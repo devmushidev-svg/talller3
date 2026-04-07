@@ -88,6 +88,21 @@ export default function TicketsActivosPage() {
   const [editLaborCost, setEditLaborCost] = useState("")
   const [editPartsCost, setEditPartsCost] = useState("")
   const [editAmountPaid, setEditAmountPaid] = useState("")
+  const [editClientName, setEditClientName] = useState("")
+  const [editClientPhone, setEditClientPhone] = useState("")
+  const [savingClient, setSavingClient] = useState(false)
+
+  const parseTicket = (t: Ticket): Ticket => ({
+    ...t,
+    accessories:
+      typeof t.accessories === "string"
+        ? JSON.parse(t.accessories as string)
+        : t.accessories || [],
+    photos:
+      typeof t.photos === "string"
+        ? JSON.parse(t.photos as string)
+        : t.photos || [],
+  })
 
   const fetchTickets = async () => {
     try {
@@ -103,15 +118,7 @@ export default function TicketsActivosPage() {
       const data = await response.json()
       
       const parsedTickets = (Array.isArray(data) ? data : [])
-        .map((t: Ticket) => ({
-          ...t,
-          accessories: typeof t.accessories === "string" 
-            ? JSON.parse(t.accessories) 
-            : t.accessories || [],
-          photos: typeof t.photos === "string"
-            ? JSON.parse(t.photos)
-            : t.photos || [],
-        }))
+        .map((t: Ticket) => parseTicket(t))
         .filter((t: Ticket) => statusFilter === 'all' ? t.status !== "entregado" : true)
 
       setTickets(parsedTickets)
@@ -162,6 +169,36 @@ export default function TicketsActivosPage() {
     }
   }
 
+  const handleSaveClient = async () => {
+    if (!selectedTicket) return
+    const name = editClientName.trim()
+    const phone = editClientPhone.trim()
+    if (!name || !phone) {
+      alert("Nombre y teléfono son obligatorios")
+      return
+    }
+    setSavingClient(true)
+    try {
+      const res = await fetch(`/api/tickets/${selectedTicket.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ client_name: name, client_phone: phone }),
+      })
+      if (!res.ok) throw new Error("Error al actualizar cliente")
+      const raw = await res.json()
+      const updated = parseTicket(raw as Ticket)
+      setSelectedTicket(updated)
+      setTickets((prev) =>
+        prev.map((t) => (t.id === selectedTicket.id ? updated : t))
+      )
+    } catch (e) {
+      console.error(e)
+      alert("No se pudo guardar los datos del cliente")
+    } finally {
+      setSavingClient(false)
+    }
+  }
+
   const handleSaveDetails = async () => {
     if (!selectedTicket) return
     
@@ -206,6 +243,8 @@ export default function TicketsActivosPage() {
 
   const openTicketDetail = (ticket: Ticket) => {
     setSelectedTicket(ticket)
+    setEditClientName(ticket.client_name)
+    setEditClientPhone(ticket.client_phone)
     setEditDiagnosis(ticket.diagnosis || '')
     setEditRepairNotes(ticket.repair_notes || '')
     setEditLaborCost(ticket.labor_cost?.toString() || '0')
@@ -510,18 +549,46 @@ export default function TicketsActivosPage() {
 
               <div className="space-y-6 pt-4">
                 {/* Client Info */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Cliente</p>
-                    <p className="font-medium">{selectedTicket.client_name}</p>
+                <div className="space-y-3 rounded-lg border border-border p-4">
+                  <p className="text-sm font-medium text-foreground">Datos del cliente</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-client-name">Nombre</Label>
+                    <Input
+                      id="edit-client-name"
+                      value={editClientName}
+                      onChange={(e) => setEditClientName(e.target.value)}
+                    />
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Teléfono</p>
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">{selectedTicket.client_phone}</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-client-phone">Teléfono</Label>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <Input
+                        id="edit-client-phone"
+                        value={editClientPhone}
+                        onChange={(e) => setEditClientPhone(e.target.value)}
+                        className="sm:flex-1"
+                      />
                       <CustomerHistory phone={selectedTicket.client_phone} name={selectedTicket.client_name} />
                     </div>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Al guardar, se actualiza el ticket y la ficha del cliente (mismo teléfono).
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={savingClient}
+                    onClick={handleSaveClient}
+                  >
+                    {savingClient ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Guardando…
+                      </>
+                    ) : (
+                      "Guardar cliente"
+                    )}
+                  </Button>
                 </div>
 
                 {/* Equipment Info */}
@@ -546,6 +613,12 @@ export default function TicketsActivosPage() {
                       {selectedTicket.serial_number || "-"}
                     </p>
                   </div>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Contraseña del equipo</p>
+                  <p className="font-medium font-mono">
+                    {selectedTicket.device_password?.trim() || "—"}
+                  </p>
                 </div>
 
                 {/* Dates */}
