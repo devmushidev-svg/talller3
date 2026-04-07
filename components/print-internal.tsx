@@ -79,8 +79,7 @@ export function PrintInternal({ ticket, open, onOpenChange }: PrintInternalProps
             Imprimir todo en orden
           </Button>
           <p className="text-xs text-muted-foreground text-center -mt-2">
-            Comprobante cliente → ticket POS → etiqueta del equipo → etiquetas de accesorios (si hay).
-            Se abre un cuadro de impresión por cada uno.
+            Un solo cuadro de impresión: comprobante, ticket POS, etiqueta de equipo y accesorios (si hay), cada bloque en página aparte para cortar.
           </p>
 
           {/* POS Receipt */}

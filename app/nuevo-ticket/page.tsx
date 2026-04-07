@@ -558,7 +558,7 @@ export default function NuevoTicketPage() {
                       </span>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Comprobante, POS, etiqueta de equipo y accesorios (si hay)
+                      Un solo trabajo en térmica: comprobante, POS, equipo y accesorios (si hay)
                     </p>
                   </div>
 
@@ -569,10 +569,10 @@ export default function NuevoTicketPage() {
                       className="w-full h-14 text-base bg-primary hover:bg-primary/90"
                     >
                       <Printer className="mr-2 h-5 w-5" />
-                      Imprimir todo (una tras otra)
+                      Imprimir todo (una sola vez)
                     </Button>
                     <p className="text-xs text-muted-foreground text-center mt-3">
-                      Cada hoja abre el cuadro de impresión; cierre o imprima y seguirá la siguiente.
+                      Se abre un solo cuadro de impresión; cada sección sale en página aparte para cortar el rollo.
                     </p>
                     <div className="mt-4 grid gap-2 sm:grid-cols-2">
                       <Button

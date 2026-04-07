@@ -9,7 +9,12 @@ import {
 } from "react"
 import { QRCodeCanvas } from "qrcode.react"
 import type { Ticket, ShopSettings } from "@/lib/types"
-import { EQUIPMENT_LABELS } from "@/lib/types"
+import {
+  ACCESSORY_CHECKBOX_LABELS,
+  EQUIPMENT_LABELS,
+  accessoryMatchesCheckbox,
+  isStandardAccessoryStored,
+} from "@/lib/types"
 
 function escapeHtml(s: string) {
   return s
@@ -30,8 +35,17 @@ function formatReceiptDate(dateStr?: string) {
   })
 }
 
+function formatPrintDateOnly(iso?: string | null) {
+  if (!iso) return "—"
+  return new Date(iso).toLocaleDateString("es-HN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  })
+}
+
 export type ThermalRollCombinedHandle = {
-  /** Una sola cola de impresión: POS, etiqueta equipo, cada accesorio — página separada para cortar. */
+  /** Un solo diálogo: comprobante cliente + POS + etiqueta equipo + accesorios (página cada uno). */
   printThermalRoll: () => void
 }
 
@@ -67,6 +81,30 @@ export const ThermalRollCombinedPrint = forwardRef<ThermalRollCombinedHandle, Pr
           ? JSON.parse(ticket.accessories)
           : ticket.accessories || []
       const accList = Array.isArray(accessories) ? accessories : []
+
+      const receivedByName = escapeHtml(ticket.received_by?.trim() || "Mario")
+      const shopAddress = escapeHtml(
+        settings.shop_address?.trim() ||
+          "B° El Centro, Contiguo A Edificio Makelo, Tocoa, Colón."
+      )
+      const shopPhonesLine = escapeHtml(
+        settings.shop_phone?.trim() || "3171-3287 · 9647-3966"
+      )
+      const displayTicketNumber = escapeHtml(
+        ticket.ticket_seq != null ? String(ticket.ticket_seq) : ticket.id
+      )
+      const emissionDate = escapeHtml(formatPrintDateOnly(ticket.created_at))
+      const expectedDate = escapeHtml(formatPrintDateOnly(ticket.estimated_delivery_date))
+      const customAccText = escapeHtml(
+        accList.filter((a: string) => !isStandardAccessoryStored(a)).join(", ")
+      )
+      const isOtherEq = !["computadora", "laptop", "impresora", "monitor"].includes(
+        ticket.equipment_type
+      )
+      const accBoxesHtml = ACCESSORY_CHECKBOX_LABELS.map((acc) => {
+        const on = accList.some((a: string) => accessoryMatchesCheckbox(a, acc))
+        return `<span class="cust-acc-item">${on ? "✓" : "·"} ${escapeHtml(acc)}</span>`
+      }).join("")
 
       const shopName = escapeHtml(settings.shop_name || "MULTIPLANET")
       const shopPhone = settings.shop_phone
@@ -161,7 +199,59 @@ export const ThermalRollCombinedPrint = forwardRef<ThermalRollCombinedHandle, Pr
           <div class="divider-dashed"></div>
         </div>`
 
+      const customerThermalBody = `
+        <div class="customer-roll">
+          <div class="cust-header">
+            <img class="cust-logo" src="/logo-multiplanet.png" alt="" />
+            <div class="cust-head-text">
+              <div class="cust-shop">${shopName}</div>
+              <div class="cust-addr">${shopAddress}</div>
+              <div class="cust-phones">${shopPhonesLine}</div>
+            </div>
+          </div>
+          <div class="cust-divider"></div>
+          <div class="cust-title-block">
+            <div class="cust-ticket-lbl">COMPROBANTE — Ticket N°</div>
+            <div class="cust-ticket-num">${displayTicketNumber}</div>
+            <div class="cust-dates">
+              <div><span class="cust-dk">Emisión:</span> ${emissionDate}</div>
+              <div><span class="cust-dk">Entrega est.:</span> ${expectedDate}</div>
+            </div>
+          </div>
+          <div class="cust-row"><span class="cust-k">Cliente:</span> ${escapeHtml(ticket.client_name)}</div>
+          <div class="cust-row"><span class="cust-k">Celular:</span> ${escapeHtml(ticket.client_phone)}</div>
+          <div class="cust-eq-line">
+            <span>${ticket.equipment_type === "computadora" ? "✓" : "·"} PC</span>
+            <span>${ticket.equipment_type === "laptop" ? "✓" : "·"} Laptop</span>
+            <span>${ticket.equipment_type === "impresora" ? "✓" : "·"} Impresora</span>
+            <span>${ticket.equipment_type === "monitor" ? "✓" : "·"} Monitor</span>
+            <span>${isOtherEq ? "✓" : "·"} Otro</span>
+          </div>
+          <div class="cust-row"><span class="cust-k">Marca:</span> ${escapeHtml(ticket.brand || "—")}</div>
+          <div class="cust-row"><span class="cust-k">Modelo:</span> ${escapeHtml(ticket.model || "—")}</div>
+          ${
+            ticket.device_password
+              ? `<div class="cust-row"><span class="cust-k">Contraseña:</span> ${escapeHtml(ticket.device_password)}</div>`
+              : ""
+          }
+          <div class="cust-acc-wrap">${accBoxesHtml}</div>
+          <div class="cust-row"><span class="cust-k">Otro acc.:</span> ${customAccText || "—"}</div>
+          <div class="cust-sect">Trabajos a realizar</div>
+          <div class="cust-problem">${escapeHtml(ticket.problem_description)}</div>
+          <div class="cust-sect">Observaciones</div>
+          <div class="cust-problem cust-empty"></div>
+          <div class="cust-footer-2">
+            <div class="cust-fbox"><div class="cust-fl">TOTAL A PAGAR</div></div>
+            <div class="cust-fbox"><div class="cust-fl">Recibido por</div><div class="cust-fn">${receivedByName}</div></div>
+          </div>
+          <div class="cust-disclaimer">
+            Nota: la empresa no se hace responsable por equipos con más de 45 días sin reclamar.
+            Para reclamo presentar factura correspondiente.
+          </div>
+        </div>`
+
       const rollPages = `
+        <div class="thermal-page">${customerThermalBody}</div>
         <div class="thermal-page">${receiptBody}</div>
         <div class="thermal-page">${deviceBody}</div>
         ${accList
@@ -226,6 +316,33 @@ export const ThermalRollCombinedPrint = forwardRef<ThermalRollCombinedHandle, Pr
           .acc-name { font-weight: 900; font-size: 13px; text-align: center; margin-bottom: 2mm; text-transform: uppercase;
             padding: 2mm; background: #000; color: #fff; }
           .acc-client { font-size: 11px; font-weight: bold; text-align: center; text-transform: uppercase; }
+          /* ——— Comprobante cliente (térmica) ——— */
+          .customer-roll { padding: 2mm; font-size: 10px; line-height: 1.35; font-weight: bold; }
+          .cust-header { display: flex; align-items: flex-start; gap: 2mm; margin-bottom: 2mm; }
+          .cust-logo { width: 12mm; height: 12mm; object-fit: contain; flex-shrink: 0; }
+          .cust-head-text { flex: 1; min-width: 0; }
+          .cust-shop { font-size: 13px; font-weight: 900; text-transform: uppercase; }
+          .cust-addr { font-size: 8px; font-weight: bold; margin-top: 1mm; }
+          .cust-phones { font-size: 10px; font-weight: 900; margin-top: 1mm; }
+          .cust-divider { border-top: 2px solid #000; margin: 2mm 0; }
+          .cust-title-block { margin-bottom: 2mm; }
+          .cust-ticket-lbl { font-size: 9px; font-weight: 900; }
+          .cust-ticket-num { font-size: 22px; font-weight: 900; color: #c00; line-height: 1.1; margin: 1mm 0; }
+          .cust-dates { font-size: 9px; margin-top: 2mm; }
+          .cust-dk { font-weight: 900; }
+          .cust-row { margin: 2mm 0; font-size: 10px; }
+          .cust-k { font-weight: 900; text-transform: uppercase; margin-right: 1mm; }
+          .cust-eq-line { display: flex; flex-wrap: wrap; gap: 2mm 3mm; font-size: 9px; margin: 2mm 0; }
+          .cust-acc-wrap { display: flex; flex-wrap: wrap; gap: 1mm 2mm; font-size: 8px; margin: 2mm 0; }
+          .cust-acc-item { white-space: nowrap; }
+          .cust-sect { font-weight: 900; font-size: 9px; text-transform: uppercase; margin-top: 3mm; }
+          .cust-problem { border: 1px solid #000; padding: 2mm; min-height: 10mm; font-size: 9px; font-weight: bold; margin-top: 1mm; }
+          .cust-problem.cust-empty { min-height: 8mm; }
+          .cust-footer-2 { display: flex; gap: 2mm; margin-top: 4mm; }
+          .cust-fbox { flex: 1; border: 1px solid #000; padding: 2mm; min-height: 14mm; }
+          .cust-fl { font-size: 8px; font-weight: 900; border-bottom: 1px solid #000; padding-bottom: 1mm; margin-bottom: 2mm; }
+          .cust-fn { font-size: 11px; font-weight: 900; }
+          .cust-disclaimer { font-size: 7px; text-align: center; margin-top: 3mm; padding-top: 2mm; border-top: 1px solid #000; font-weight: bold; }
       `
 
       const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Térmica ${ticket.id}</title><style>${css}</style></head><body>${rollPages}</body></html>`

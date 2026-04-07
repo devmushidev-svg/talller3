@@ -9,7 +9,6 @@ import {
   useState,
 } from "react"
 import type { Ticket, ShopSettings } from "@/lib/types"
-import { CustomerTicket, type CustomerTicketHandle } from "./customer-ticket"
 import {
   ThermalRollCombinedPrint,
   type ThermalRollCombinedHandle,
@@ -23,7 +22,6 @@ const defaultSettings: ShopSettings = {
   printer_width: "80mm",
 }
 
-const BETWEEN_PRINTS_MS = 1100
 const QR_WARMUP_MS = 550
 
 function sleep(ms: number) {
@@ -31,7 +29,7 @@ function sleep(ms: number) {
 }
 
 export type TicketFullPrintBundleHandle = {
-  /** Comprobante cliente → una cola térmica (POS + equipo + accesorios, páginas separadas). */
+  /** Un solo cuadro de impresión: comprobante + POS + equipo + accesorios (páginas para cortar). */
   printAll: () => Promise<void>
 }
 
@@ -45,7 +43,6 @@ export const TicketFullPrintBundle = forwardRef<
 >(function TicketFullPrintBundle({ ticket }, ref) {
   const [settings, setSettings] = useState<ShopSettings>(defaultSettings)
 
-  const customerRef = useRef<CustomerTicketHandle>(null)
   const thermalRef = useRef<ThermalRollCombinedHandle>(null)
 
   useEffect(() => {
@@ -61,8 +58,6 @@ export const TicketFullPrintBundle = forwardRef<
 
   const printAll = useCallback(async () => {
     await sleep(QR_WARMUP_MS)
-    customerRef.current?.print()
-    await sleep(BETWEEN_PRINTS_MS)
     thermalRef.current?.printThermalRoll()
   }, [])
 
@@ -73,12 +68,6 @@ export const TicketFullPrintBundle = forwardRef<
       className="pointer-events-none fixed left-[-10000px] top-0 w-[480px] opacity-0"
       aria-hidden
     >
-      <CustomerTicket
-        ref={customerRef}
-        ticket={ticket}
-        settings={settings}
-        hideTrigger
-      />
       <ThermalRollCombinedPrint
         ref={thermalRef}
         ticket={ticket}

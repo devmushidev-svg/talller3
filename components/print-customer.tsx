@@ -62,7 +62,7 @@ export function PrintCustomer({ ticket, open, onOpenChange }: PrintCustomerProps
             onClick={() => void printBundleRef.current?.printAll()}
           >
             <Printer className="mr-2 h-4 w-4" />
-            Imprimir todo (cliente + POS + etiquetas)
+            Imprimir todo en térmica (una vez)
           </Button>
 
           <div className="p-4 bg-muted rounded-lg text-center">
@@ -73,7 +73,7 @@ export function PrintCustomer({ ticket, open, onOpenChange }: PrintCustomerProps
               </span>
             </p>
             <p className="text-sm text-muted-foreground">
-              Abajo puede imprimir solo el comprobante en media carta.
+              Abajo puede imprimir el comprobante en media carta por separado.
             </p>
           </div>
 
