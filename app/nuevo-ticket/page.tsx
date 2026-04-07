@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -26,8 +26,6 @@ import {
 import { Save, Printer, Loader2, Calendar, DollarSign, FileText, Plus, X } from "lucide-react"
 import { PhotoUpload } from "@/components/photo-upload"
 import { CustomerHistory } from "@/components/customer-history"
-import { PrintCustomer } from "@/components/print-customer"
-import { PrintInternal } from "@/components/print-internal"
 import {
   TicketFullPrintBundle,
   type TicketFullPrintBundleHandle,
@@ -63,11 +61,98 @@ export default function NuevoTicketPage() {
   const [tempTicketId] = useState(() => `TKT-${Date.now()}`)
   
   const [savedTicket, setSavedTicket] = useState<Ticket | null>(null)
-  const [showPrintDialog, setShowPrintDialog] = useState(false)
-  const [showInternalPrint, setShowInternalPrint] = useState(false)
   const printBundleRef = useRef<TicketFullPrintBundleHandle>(null)
   const [saving, setSaving] = useState(false)
   const [customerExists, setCustomerExists] = useState(false)
+  const [equipmentSelectOpen, setEquipmentSelectOpen] = useState(false)
+
+  /** Navegación rápida: ↑ ↓ y Enter hasta “Problema”; desde Accesorios el flujo sigue con el ratón. */
+  const kbReceivedByRef = useRef<HTMLInputElement>(null)
+  const kbClientNameRef = useRef<HTMLInputElement>(null)
+  const kbClientPhoneRef = useRef<HTMLInputElement>(null)
+  const kbEquipmentTriggerRef = useRef<HTMLButtonElement>(null)
+  const kbBrandRef = useRef<HTMLInputElement>(null)
+  const kbModelRef = useRef<HTMLInputElement>(null)
+  const kbDevicePasswordRef = useRef<HTMLInputElement>(null)
+  const kbProblemRef = useRef<HTMLTextAreaElement>(null)
+  const accessoriesMouseSectionRef = useRef<HTMLDivElement>(null)
+
+  const FIELD_CHAIN_LAST = 7
+
+  const focusKbField = useCallback((index: number) => {
+    const refs = [
+      kbReceivedByRef,
+      kbClientNameRef,
+      kbClientPhoneRef,
+      kbEquipmentTriggerRef,
+      kbBrandRef,
+      kbModelRef,
+      kbDevicePasswordRef,
+      kbProblemRef,
+    ] as const
+    const el = refs[index]?.current
+    if (!el) return
+    el.focus()
+    if (el instanceof HTMLInputElement && el.type !== "date" && el.type !== "number") {
+      try {
+        el.select()
+      } catch {
+        /* no-op */
+      }
+    }
+  }, [])
+
+  const scrollToAccessoriesAndEndKeyboard = useCallback(
+    (fromEl: HTMLElement) => {
+      accessoriesMouseSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      })
+      fromEl.blur()
+      requestAnimationFrame(() => {
+        document.getElementById("guardar-imprimir-ticket")?.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+        })
+      })
+    },
+    []
+  )
+
+  const onTicketFieldChainKeyDown = useCallback(
+    (e: React.KeyboardEvent, index: number) => {
+      const goNext = () => {
+        e.preventDefault()
+        if (index >= FIELD_CHAIN_LAST) {
+          scrollToAccessoriesAndEndKeyboard(e.currentTarget)
+          return
+        }
+        focusKbField(index + 1)
+      }
+      const goPrev = () => {
+        e.preventDefault()
+        if (index <= 0) return
+        focusKbField(index - 1)
+      }
+
+      if (e.key === "ArrowDown") {
+        if (index === 3 && equipmentSelectOpen) return
+        goNext()
+        return
+      }
+      if (e.key === "ArrowUp") {
+        if (index === 3 && equipmentSelectOpen) return
+        goPrev()
+        return
+      }
+      if (e.key === "Enter") {
+        if (e.target instanceof HTMLTextAreaElement && e.shiftKey) return
+        if (index === 3 && e.target instanceof HTMLButtonElement) return
+        goNext()
+      }
+    },
+    [equipmentSelectOpen, focusKbField, scrollToAccessoriesAndEndKeyboard]
+  )
 
   // Check if customer exists when phone changes
   useEffect(() => {
@@ -136,8 +221,6 @@ export default function NuevoTicketPage() {
     setInternalNotes("")
     setPhotos([])
     setSavedTicket(null)
-    setShowPrintDialog(false)
-    setShowInternalPrint(false)
     setCustomerExists(false)
   }
 
@@ -229,6 +312,18 @@ export default function NuevoTicketPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Nuevo Ticket</h1>
           <p className="text-muted-foreground">Registro rápido de equipos</p>
+          {!savedTicket && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              <kbd className="rounded border bg-muted px-1.5 py-0.5 text-xs">↑</kbd>{" "}
+              <kbd className="rounded border bg-muted px-1.5 py-0.5 text-xs">↓</kbd>{" "}
+              <kbd className="rounded border bg-muted px-1.5 py-0.5 text-xs">Enter</kbd>{" "}
+              para moverse entre campos hasta <strong className="text-foreground">Problema</strong>.
+              En <strong className="text-foreground">Accesorios</strong> use el ratón (y el botón
+              imprimir). En el cuadro de texto: <kbd className="rounded border bg-muted px-1.5 py-0.5 text-xs">Shift</kbd>{" "}
+              + <kbd className="rounded border bg-muted px-1.5 py-0.5 text-xs">Enter</kbd> para
+              nueva línea.
+            </p>
+          )}
         </div>
 
         <div className="grid gap-6">
@@ -242,11 +337,14 @@ export default function NuevoTicketPage() {
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="receivedBy">Recibió en taller</Label>
                   <Input
+                    ref={kbReceivedByRef}
                     id="receivedBy"
                     value={receivedBy}
                     onChange={(e) => setReceivedBy(e.target.value)}
                     placeholder="Nombre de quien recibe el equipo"
                     className="h-11 text-base"
+                    autoFocus
+                    onKeyDown={(e) => onTicketFieldChainKeyDown(e, 0)}
                   />
                   <p className="text-xs text-muted-foreground">
                     Por defecto Mario; cámbielo si recibe otra persona.
@@ -255,23 +353,26 @@ export default function NuevoTicketPage() {
                 <div className="space-y-2">
                   <Label htmlFor="clientName">Nombre del Cliente *</Label>
                   <Input
+                    ref={kbClientNameRef}
                     id="clientName"
                     value={clientName}
                     onChange={(e) => setClientName(e.target.value)}
                     placeholder="Nombre completo"
                     className="h-12 text-lg"
-                    autoFocus
+                    onKeyDown={(e) => onTicketFieldChainKeyDown(e, 1)}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="clientPhone">Teléfono *</Label>
                   <Input
+                    ref={kbClientPhoneRef}
                     id="clientPhone"
                     value={clientPhone}
                     onChange={(e) => setClientPhone(e.target.value)}
                     placeholder="9999-9999"
                     className="h-12 text-lg"
                     type="tel"
+                    onKeyDown={(e) => onTicketFieldChainKeyDown(e, 2)}
                   />
                 </div>
               </div>
@@ -297,9 +398,15 @@ export default function NuevoTicketPage() {
                   <Label htmlFor="equipmentType">Tipo de Equipo</Label>
                   <Select
                     value={equipmentType}
+                    open={equipmentSelectOpen}
+                    onOpenChange={setEquipmentSelectOpen}
                     onValueChange={(v) => setEquipmentType(v as EquipmentType)}
                   >
-                    <SelectTrigger className="h-12 text-base">
+                    <SelectTrigger
+                      ref={kbEquipmentTriggerRef}
+                      className="h-12 text-base"
+                      onKeyDown={(e) => onTicketFieldChainKeyDown(e, 3)}
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -316,21 +423,25 @@ export default function NuevoTicketPage() {
                 <div className="space-y-2">
                   <Label htmlFor="brand">Marca</Label>
                   <Input
+                    ref={kbBrandRef}
                     id="brand"
                     value={brand}
                     onChange={(e) => setBrand(e.target.value)}
                     placeholder="HP, Dell, Epson..."
                     className="h-12 text-base"
+                    onKeyDown={(e) => onTicketFieldChainKeyDown(e, 4)}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="model">Modelo</Label>
                   <Input
+                    ref={kbModelRef}
                     id="model"
                     value={model}
                     onChange={(e) => setModel(e.target.value)}
                     placeholder="Modelo"
                     className="h-12 text-base"
+                    onKeyDown={(e) => onTicketFieldChainKeyDown(e, 5)}
                   />
                 </div>
               </div>
@@ -338,6 +449,7 @@ export default function NuevoTicketPage() {
               <div className="space-y-2">
                 <Label htmlFor="devicePassword">Contraseña del equipo</Label>
                 <Input
+                  ref={kbDevicePasswordRef}
                   id="devicePassword"
                   type="text"
                   autoComplete="off"
@@ -345,6 +457,7 @@ export default function NuevoTicketPage() {
                   onChange={(e) => setDevicePassword(e.target.value)}
                   placeholder="Windows, PIN, BIOS… (opcional)"
                   className="h-12 text-base"
+                  onKeyDown={(e) => onTicketFieldChainKeyDown(e, 6)}
                 />
                 <p className="text-xs text-muted-foreground">
                   Opcional. Queda en el expediente del ticket y en las impresiones del taller.
@@ -354,11 +467,13 @@ export default function NuevoTicketPage() {
               <div className="space-y-2">
                 <Label htmlFor="problemDescription">Problema Reportado *</Label>
                 <Textarea
+                  ref={kbProblemRef}
                   id="problemDescription"
                   value={problemDescription}
                   onChange={(e) => setProblemDescription(e.target.value)}
                   placeholder="Describa el problema del equipo..."
                   className="min-h-24 text-base"
+                  onKeyDown={(e) => onTicketFieldChainKeyDown(e, 7)}
                 />
               </div>
 
@@ -372,12 +487,18 @@ export default function NuevoTicketPage() {
             </CardContent>
           </Card>
 
-          {/* Accessories */}
+          {/* Accessories — desde aquí el flujo es con ratón; fechas, notas e imprimir */}
           <Card className="border-border">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg">Accesorios Recibidos</CardTitle>
+              {!savedTicket && (
+                <p className="text-sm font-normal text-muted-foreground">
+                  Use el ratón para marcar accesorios y completar el resto del formulario; termine con{" "}
+                  <strong className="text-foreground">Guardar e imprimir</strong>.
+                </p>
+              )}
             </CardHeader>
-            <CardContent>
+            <CardContent ref={accessoriesMouseSectionRef} id="accesorios-raton">
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-3">
                 {ACCESSORY_CHECKBOX_LABELS.map((accessory) => (
                   <div key={accessory} className="flex items-center space-x-2">
@@ -531,6 +652,7 @@ export default function NuevoTicketPage() {
                 Solo Guardar
               </Button>
               <Button
+                id="guardar-imprimir-ticket"
                 onClick={() => handleSave(true)}
                 size="lg"
                 className="h-14 text-base bg-primary hover:bg-primary/90"
@@ -548,7 +670,7 @@ export default function NuevoTicketPage() {
             <Card className="border-green-500 bg-green-50 dark:bg-green-950">
               <CardContent className="pt-6">
                 <div className="space-y-6">
-                  <div className="flex flex-col items-center gap-1 text-green-700 dark:text-green-400">
+                  <div className="flex flex-col items-center gap-2 text-center text-green-700 dark:text-green-400">
                     <div className="flex items-center gap-2">
                       <Save className="h-6 w-6" />
                       <span className="text-lg font-semibold">
@@ -558,43 +680,9 @@ export default function NuevoTicketPage() {
                       </span>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Un solo trabajo en térmica: comprobante, POS, equipo y accesorios (si hay)
+                      El ticket quedó registrado correctamente.
                     </p>
                   </div>
-
-                  <div className="p-4 bg-background rounded-lg border-2 border-primary">
-                    <Button
-                      onClick={() => void printBundleRef.current?.printAll()}
-                      size="lg"
-                      className="w-full h-14 text-base bg-primary hover:bg-primary/90"
-                    >
-                      <Printer className="mr-2 h-5 w-5" />
-                      Imprimir todo (una sola vez)
-                    </Button>
-                    <p className="text-xs text-muted-foreground text-center mt-3">
-                      Se abre un solo cuadro de impresión; cada sección sale en página aparte para cortar el rollo.
-                    </p>
-                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowPrintDialog(true)}
-                        className="w-full"
-                      >
-                        <FileText className="mr-2 h-4 w-4" />
-                        Solo comprobante cliente
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowInternalPrint(true)}
-                        className="w-full"
-                      >
-                        <Printer className="mr-2 h-4 w-4" />
-                        Solo uso interno
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Nuevo Ticket */}
                   <Button
                     onClick={handleNewTicket}
                     size="lg"
@@ -610,21 +698,8 @@ export default function NuevoTicketPage() {
         </div>
       </div>
 
-      {/* Print Dialogs */}
       {savedTicket && (
-        <>
-          <TicketFullPrintBundle ref={printBundleRef} ticket={savedTicket} />
-          <PrintCustomer
-            ticket={savedTicket}
-            open={showPrintDialog}
-            onOpenChange={setShowPrintDialog}
-          />
-          <PrintInternal
-            ticket={savedTicket}
-            open={showInternalPrint}
-            onOpenChange={setShowInternalPrint}
-          />
-        </>
+        <TicketFullPrintBundle ref={printBundleRef} ticket={savedTicket} />
       )}
     </DashboardLayout>
   )
