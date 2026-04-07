@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef } from "react"
+import { forwardRef, useCallback, useImperativeHandle, useRef } from "react"
 import {
   Ticket,
   ShopSettings,
@@ -11,27 +11,52 @@ import {
 import { Button } from "@/components/ui/button"
 import { Printer } from "lucide-react"
 
+export type CustomerTicketHandle = { print: () => void }
+
 interface CustomerTicketProps {
   ticket: Ticket
   settings: ShopSettings
   onPrint?: () => void
+  /** Ocultar el botón (p. ej. impresión en lote) */
+  hideTrigger?: boolean
 }
 
-export function CustomerTicket({ ticket, settings, onPrint }: CustomerTicketProps) {
+function formatPrintDate(iso?: string | null) {
+  if (!iso) return "—"
+  return new Date(iso).toLocaleDateString("es-HN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  })
+}
+
+export const CustomerTicket = forwardRef<CustomerTicketHandle, CustomerTicketProps>(
+  function CustomerTicket({ ticket, settings, onPrint, hideTrigger = false }, ref) {
   const printRef = useRef<HTMLDivElement>(null)
 
-  const handlePrint = () => {
+  const displayTicketNumber =
+    ticket.ticket_seq != null ? String(ticket.ticket_seq) : ticket.id
+
+  const receivedByName = ticket.received_by?.trim() || "Mario"
+
+  const shopAddress =
+    settings.shop_address?.trim() ||
+    "B° El Centro, Contiguo A Edificio Makelo, Tocoa, Colón."
+
+  const shopPhonesLine =
+    settings.shop_phone?.trim() || "3171-3287 · 9647-3966"
+
+  const handlePrint = useCallback(() => {
     const printContent = printRef.current
     if (!printContent) return
 
-    // Create iframe for printing
-    const iframe = document.createElement('iframe')
-    iframe.style.position = 'fixed'
-    iframe.style.right = '0'
-    iframe.style.bottom = '0'
-    iframe.style.width = '0'
-    iframe.style.height = '0'
-    iframe.style.border = 'none'
+    const iframe = document.createElement("iframe")
+    iframe.style.position = "fixed"
+    iframe.style.right = "0"
+    iframe.style.bottom = "0"
+    iframe.style.width = "0"
+    iframe.style.height = "0"
+    iframe.style.border = "none"
     document.body.appendChild(iframe)
 
     const doc = iframe.contentDocument || iframe.contentWindow?.document
@@ -45,7 +70,7 @@ export function CustomerTicket({ ticket, settings, onPrint }: CustomerTicketProp
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Orden de Trabajo - ${ticket.id}</title>
+        <title>Ticket N° ${displayTicketNumber}</title>
         <style>
           @page {
             size: half-letter portrait;
@@ -59,7 +84,7 @@ export function CustomerTicket({ ticket, settings, onPrint }: CustomerTicketProp
           body {
             font-family: Arial, sans-serif;
             font-size: 11px;
-            line-height: 1.3;
+            line-height: 1.35;
             color: #000;
             background: #fff;
           }
@@ -75,7 +100,7 @@ export function CustomerTicket({ ticket, settings, onPrint }: CustomerTicketProp
             gap: 10px;
             border-bottom: 2px solid #000;
             padding-bottom: 6px;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
           }
           .logo {
             width: 50px;
@@ -90,42 +115,48 @@ export function CustomerTicket({ ticket, settings, onPrint }: CustomerTicketProp
             font-weight: bold;
             letter-spacing: 1px;
           }
-          .shop-info {
+          .shop-address {
             font-size: 10px;
+            margin-top: 2px;
+          }
+          .shop-phones {
+            font-size: 14px;
+            font-weight: bold;
+            margin-top: 5px;
+            letter-spacing: 0.3px;
           }
           .title-row {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
+            gap: 10px;
             margin: 8px 0;
-            padding-bottom: 6px;
+            padding-bottom: 8px;
             border-bottom: 1px solid #000;
           }
-          .order-title {
-            font-size: 13px;
+          .ticket-num-wrap {
+            flex: 1;
+          }
+          .ticket-num-label {
+            font-size: 11px;
             font-weight: bold;
           }
-          .order-number {
-            font-size: 18px;
+          .ticket-num-value {
+            font-size: 28px;
             font-weight: bold;
             color: #c00;
+            line-height: 1.1;
+            margin-top: 2px;
           }
-          .date-box {
-            display: flex;
-            gap: 3px;
-            font-size: 10px;
+          .dates-block {
+            text-align: right;
+            font-size: 11px;
+            line-height: 1.5;
           }
-          .date-cell {
-            border: 1px solid #000;
-            padding: 2px 6px;
-            text-align: center;
-            min-width: 32px;
-          }
-          .date-cell span {
-            display: block;
-            font-size: 8px;
-            border-bottom: 1px solid #000;
-            margin-bottom: 1px;
+          .dates-block strong {
+            display: inline-block;
+            min-width: 118px;
+            text-align: left;
           }
           .field-row {
             display: flex;
@@ -134,7 +165,7 @@ export function CustomerTicket({ ticket, settings, onPrint }: CustomerTicketProp
           }
           .field-label {
             font-weight: bold;
-            min-width: 65px;
+            min-width: 72px;
             font-size: 10px;
           }
           .field-value {
@@ -142,6 +173,10 @@ export function CustomerTicket({ ticket, settings, onPrint }: CustomerTicketProp
             border-bottom: 1px solid #000;
             padding-bottom: 1px;
             min-height: 14px;
+          }
+          .client-phone-value {
+            font-size: 15px;
+            font-weight: bold;
           }
           .checkbox-row {
             display: flex;
@@ -182,26 +217,30 @@ export function CustomerTicket({ ticket, settings, onPrint }: CustomerTicketProp
           }
           .footer-row {
             display: flex;
-            gap: 8px;
-            margin-top: 10px;
+            gap: 10px;
+            margin-top: 12px;
           }
           .footer-box {
             flex: 1;
             border: 1px solid #000;
-            padding: 4px;
-            min-height: 40px;
+            padding: 6px;
+            min-height: 48px;
           }
           .footer-box-label {
-            font-size: 8px;
+            font-size: 9px;
             font-weight: bold;
             border-bottom: 1px solid #000;
-            margin-bottom: 2px;
-            padding-bottom: 1px;
+            margin-bottom: 6px;
+            padding-bottom: 2px;
+          }
+          .footer-received-name {
+            font-size: 13px;
+            font-weight: bold;
           }
           .disclaimer {
             font-size: 8px;
             text-align: center;
-            margin-top: 8px;
+            margin-top: 10px;
             padding-top: 6px;
             border-top: 1px solid #000;
           }
@@ -214,15 +253,13 @@ export function CustomerTicket({ ticket, settings, onPrint }: CustomerTicketProp
     `)
     doc.close()
 
-    // Use timeout instead of onload for more reliable printing
     setTimeout(() => {
       try {
         iframe.contentWindow?.focus()
         iframe.contentWindow?.print()
       } catch (e) {
-        console.error('Print error:', e)
+        console.error("Print error:", e)
       }
-      // Remove iframe after print dialog closes
       setTimeout(() => {
         if (iframe.parentNode) {
           document.body.removeChild(iframe)
@@ -231,130 +268,124 @@ export function CustomerTicket({ ticket, settings, onPrint }: CustomerTicketProp
     }, 250)
 
     onPrint?.()
-  }
+  }, [ticket, settings, onPrint, displayTicketNumber, receivedByName, shopAddress, shopPhonesLine])
 
-  const accessories = typeof ticket.accessories === 'string' 
-    ? JSON.parse(ticket.accessories) 
-    : ticket.accessories || []
+  useImperativeHandle(ref, () => ({ print: handlePrint }), [handlePrint])
 
-  const createdDate = new Date(ticket.created_at || Date.now())
-  const day = createdDate.getDate().toString().padStart(2, '0')
-  const month = (createdDate.getMonth() + 1).toString().padStart(2, '0')
-  const year = createdDate.getFullYear().toString().slice(-2)
+  const accessories =
+    typeof ticket.accessories === "string"
+      ? JSON.parse(ticket.accessories)
+      : ticket.accessories || []
 
   const customAccessoriesText = accessories
     .filter((a: string) => !isStandardAccessoryStored(a))
-    .join(', ')
+    .join(", ")
+
+  const emissionDate = formatPrintDate(ticket.created_at)
+  const expectedDate = formatPrintDate(ticket.estimated_delivery_date)
 
   return (
     <div className="space-y-4">
-      <Button onClick={handlePrint} className="w-full">
-        <Printer className="mr-2 h-4 w-4" />
-        Imprimir Orden de Trabajo
-      </Button>
+      {!hideTrigger && (
+        <Button onClick={handlePrint} className="w-full">
+          <Printer className="mr-2 h-4 w-4" />
+          Imprimir comprobante
+        </Button>
+      )}
 
       <div ref={printRef} className="hidden">
         <div className="ticket-container">
-          {/* Header with Logo */}
           <div className="header">
             <img src="/logo-multiplanet.png" alt="Multiplanet" className="logo" />
             <div className="header-text">
-              <div className="shop-name">MULTIPLANET</div>
-              <div className="shop-info">
-                B° El Centro, Contiguo A Edificio Makelo, Tocoa, Colón.<br/>
-                Cel.: 3171-3287 * 9647-3966 E-mail: multiplanettocoa@yahoo.com
-              </div>
+              <div className="shop-name">{settings.shop_name?.trim() || "MULTIPLANET"}</div>
+              <div className="shop-address">{shopAddress}</div>
+              <div className="shop-phones">{shopPhonesLine}</div>
             </div>
           </div>
 
-          {/* Title Row */}
           <div className="title-row">
-            <div>
-              <div className="order-title">ORDEN DE TRABAJO</div>
-              <div className="order-number">N° {ticket.id}</div>
+            <div className="ticket-num-wrap">
+              <div className="ticket-num-label">Ticket N°</div>
+              <div className="ticket-num-value">{displayTicketNumber}</div>
             </div>
-            <div>
-              <div style={{ fontSize: '9px', marginBottom: '3px' }}>FECHA DE RECIBO</div>
-              <div className="date-box">
-                <div className="date-cell">
-                  <span>DÍA</span>
-                  {day}
-                </div>
-                <div className="date-cell">
-                  <span>MES</span>
-                  {month}
-                </div>
-                <div className="date-cell">
-                  <span>AÑO</span>
-                  {year}
-                </div>
+            <div className="dates-block">
+              <div>
+                <strong>Fecha de emisión:</strong> {emissionDate}
+              </div>
+              <div>
+                <strong>Entrega estimada:</strong> {expectedDate}
               </div>
             </div>
           </div>
 
-          {/* Client Info */}
           <div className="field-row">
             <span className="field-label">Cliente:</span>
             <span className="field-value">{ticket.client_name}</span>
           </div>
           <div className="field-row">
-            <span className="field-label">Dirección:</span>
-            <span className="field-value"></span>
-          </div>
-          <div className="field-row">
             <span className="field-label">Celular:</span>
-            <span className="field-value">{ticket.client_phone}</span>
+            <span className="field-value client-phone-value">{ticket.client_phone}</span>
           </div>
 
-          {/* Equipment Type */}
-          <div className="checkbox-row" style={{ marginTop: '8px' }}>
+          <div className="checkbox-row" style={{ marginTop: "8px" }}>
             <div className="checkbox-item">
-              <span className={`checkbox ${ticket.equipment_type === 'computadora' ? 'checked' : ''}`}></span>
+              <span
+                className={`checkbox ${ticket.equipment_type === "computadora" ? "checked" : ""}`}
+              ></span>
               <span>Computadora</span>
             </div>
             <div className="checkbox-item">
-              <span className={`checkbox ${ticket.equipment_type === 'laptop' ? 'checked' : ''}`}></span>
+              <span
+                className={`checkbox ${ticket.equipment_type === "laptop" ? "checked" : ""}`}
+              ></span>
               <span>Laptop</span>
             </div>
             <div className="checkbox-item">
-              <span className={`checkbox ${ticket.equipment_type === 'impresora' ? 'checked' : ''}`}></span>
+              <span
+                className={`checkbox ${ticket.equipment_type === "impresora" ? "checked" : ""}`}
+              ></span>
               <span>Impresora</span>
             </div>
             <div className="checkbox-item">
-              <span className={`checkbox ${ticket.equipment_type === 'monitor' ? 'checked' : ''}`}></span>
+              <span
+                className={`checkbox ${ticket.equipment_type === "monitor" ? "checked" : ""}`}
+              ></span>
               <span>Monitor</span>
             </div>
             <div className="checkbox-item">
-              <span className={`checkbox ${!['computadora', 'laptop', 'impresora', 'monitor'].includes(ticket.equipment_type) ? 'checked' : ''}`}></span>
+              <span
+                className={`checkbox ${!["computadora", "laptop", "impresora", "monitor"].includes(ticket.equipment_type) ? "checked" : ""}`}
+              ></span>
               <span>Otro</span>
             </div>
           </div>
 
-          {/* Brand & Model */}
           <div className="field-row">
             <span className="field-label">Marca:</span>
-            <span className="field-value">{ticket.brand || ''}</span>
+            <span className="field-value">{ticket.brand || ""}</span>
           </div>
           <div className="field-row">
             <span className="field-label">Modelo:</span>
-            <span className="field-value">{ticket.model || ''}</span>
+            <span className="field-value">{ticket.model || ""}</span>
           </div>
           {ticket.device_password && (
             <div className="field-row">
               <span className="field-label">Contraseña:</span>
-              <span className="field-value" style={{ fontFamily: 'monospace' }}>{ticket.device_password}</span>
+              <span className="field-value" style={{ fontFamily: "monospace" }}>
+                {ticket.device_password}
+              </span>
             </div>
           )}
 
-          {/* Accessories */}
           <div className="checkbox-row">
             {ACCESSORY_CHECKBOX_LABELS.map((acc) => (
               <div key={acc} className="checkbox-item">
                 <span
                   className={`checkbox ${
                     accessories.some((a: string) => accessoryMatchesCheckbox(a, acc))
-                      ? 'checked'
-                      : ''
+                      ? "checked"
+                      : ""
                   }`}
                 ></span>
                 <span>{acc}</span>
@@ -366,35 +397,32 @@ export function CustomerTicket({ ticket, settings, onPrint }: CustomerTicketProp
             <span className="field-value">{customAccessoriesText}</span>
           </div>
 
-          {/* Work Description */}
           <div className="section-title">Trabajos a Realizar:</div>
           <div className="text-area">{ticket.problem_description}</div>
 
-          {/* Observations */}
           <div className="section-title">Observaciones:</div>
           <div className="text-area"></div>
 
-          {/* Footer Boxes */}
           <div className="footer-row">
             <div className="footer-box">
               <div className="footer-box-label">TOTAL A PAGAR</div>
             </div>
             <div className="footer-box">
-              <div className="footer-box-label">Recibido por:</div>
-            </div>
-            <div className="footer-box">
-              <div className="footer-box-label">Escriba su contraseña</div>
+              <div className="footer-box-label">Recibido por</div>
+              <div className="footer-received-name">{receivedByName}</div>
             </div>
           </div>
 
-          {/* Disclaimer */}
           <div className="disclaimer">
-            <strong>Nota:</strong> La empresa no se hace responsable por equipos con más de 45 días<br/>
-            sin reclamar desde la fecha de ingreso.<br/>
+            <strong>Nota:</strong> La empresa no se hace responsable por equipos con más de 45
+            días
+            <br />
+            sin reclamar desde la fecha de ingreso.
+            <br />
             <strong>PARA RECLAMO DE SU ARTÍCULO PRESENTAR FACTURA CORRESPONDIENTE.</strong>
           </div>
         </div>
       </div>
     </div>
   )
-}
+})

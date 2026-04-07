@@ -1,45 +1,50 @@
 "use client"
 
-import { useRef } from "react"
+import { forwardRef, useCallback, useImperativeHandle, useRef } from "react"
 import { Ticket } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Tags } from "lucide-react"
 
+export type AccessoryLabelsHandle = { print: () => void }
+
 interface AccessoryLabelsProps {
   ticket: Ticket
   onPrint?: () => void
+  hideTrigger?: boolean
 }
 
-export function AccessoryLabels({ ticket, onPrint }: AccessoryLabelsProps) {
-  const printRef = useRef<HTMLDivElement>(null)
+export const AccessoryLabels = forwardRef<AccessoryLabelsHandle, AccessoryLabelsProps>(
+  function AccessoryLabels({ ticket, onPrint, hideTrigger = false }, ref) {
+    const printRef = useRef<HTMLDivElement>(null)
 
-  const accessories = typeof ticket.accessories === 'string' 
-    ? JSON.parse(ticket.accessories) 
-    : ticket.accessories || []
+    const accessories =
+      typeof ticket.accessories === "string"
+        ? JSON.parse(ticket.accessories)
+        : ticket.accessories || []
 
-  const handlePrint = () => {
-    if (accessories.length === 0) return
+    const handlePrint = useCallback(() => {
+      if (accessories.length === 0) return
 
-    const printContent = printRef.current
-    if (!printContent) return
+      const printContent = printRef.current
+      if (!printContent) return
 
-    const iframe = document.createElement('iframe')
-    iframe.style.position = 'fixed'
-    iframe.style.right = '0'
-    iframe.style.bottom = '0'
-    iframe.style.width = '0'
-    iframe.style.height = '0'
-    iframe.style.border = 'none'
-    document.body.appendChild(iframe)
+      const iframe = document.createElement("iframe")
+      iframe.style.position = "fixed"
+      iframe.style.right = "0"
+      iframe.style.bottom = "0"
+      iframe.style.width = "0"
+      iframe.style.height = "0"
+      iframe.style.border = "none"
+      document.body.appendChild(iframe)
 
-    const doc = iframe.contentDocument || iframe.contentWindow?.document
-    if (!doc) {
-      document.body.removeChild(iframe)
-      return
-    }
+      const doc = iframe.contentDocument || iframe.contentWindow?.document
+      if (!doc) {
+        document.body.removeChild(iframe)
+        return
+      }
 
-    doc.open()
-    doc.write(`
+      doc.open()
+      doc.write(`
       <!DOCTYPE html>
       <html>
       <head>
@@ -101,43 +106,46 @@ export function AccessoryLabels({ ticket, onPrint }: AccessoryLabelsProps) {
       </body>
       </html>
     `)
-    doc.close()
+      doc.close()
 
-    setTimeout(() => {
-      try {
-        iframe.contentWindow?.focus()
-        iframe.contentWindow?.print()
-      } catch (e) {
-        console.error('Print error:', e)
-      }
       setTimeout(() => {
-        if (iframe.parentNode) {
-          document.body.removeChild(iframe)
+        try {
+          iframe.contentWindow?.focus()
+          iframe.contentWindow?.print()
+        } catch (e) {
+          console.error("Print error:", e)
         }
-      }, 1000)
-    }, 250)
+        setTimeout(() => {
+          if (iframe.parentNode) {
+            document.body.removeChild(iframe)
+          }
+        }, 1000)
+      }, 250)
 
-    onPrint?.()
-  }
+      onPrint?.()
+    }, [ticket, onPrint])
 
-  if (accessories.length === 0) return null
+    useImperativeHandle(ref, () => ({ print: handlePrint }), [handlePrint])
 
-  return (
-    <div className="space-y-4">
-      <Button onClick={handlePrint} variant="outline" className="w-full">
-        <Tags className="mr-2 h-4 w-4" />
-        Imprimir Etiquetas Accesorios ({accessories.length})
-      </Button>
+    return (
+      <div className="space-y-4">
+        {!hideTrigger && accessories.length > 0 && (
+          <Button onClick={handlePrint} variant="outline" className="w-full">
+            <Tags className="mr-2 h-4 w-4" />
+            Imprimir Etiquetas Accesorios ({accessories.length})
+          </Button>
+        )}
 
-      <div ref={printRef} className="hidden">
-        {accessories.map((accessory: string, index: number) => (
-          <div key={index} className="label">
-            <div className="ticket-id">{ticket.id}</div>
-            <div className="accessory">{accessory}</div>
-            <div className="client">{ticket.client_name}</div>
-          </div>
-        ))}
+        <div ref={printRef} className="hidden">
+          {accessories.map((accessory: string, index: number) => (
+            <div key={index} className="label">
+              <div className="ticket-id">{ticket.id}</div>
+              <div className="accessory">{accessory}</div>
+              <div className="client">{ticket.client_name}</div>
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
-  )
-}
+    )
+  }
+)

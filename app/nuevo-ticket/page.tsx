@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -28,6 +28,10 @@ import { PhotoUpload } from "@/components/photo-upload"
 import { CustomerHistory } from "@/components/customer-history"
 import { PrintCustomer } from "@/components/print-customer"
 import { PrintInternal } from "@/components/print-internal"
+import {
+  TicketFullPrintBundle,
+  type TicketFullPrintBundleHandle,
+} from "@/components/ticket-full-print-bundle"
 
 /** Valor para <input type="date"> en hora local (evita desfase UTC). */
 function getLocalDateInputValue(date = new Date()) {
@@ -40,6 +44,7 @@ function getLocalDateInputValue(date = new Date()) {
 export default function NuevoTicketPage() {
   const [clientName, setClientName] = useState("")
   const [clientPhone, setClientPhone] = useState("")
+  const [receivedBy, setReceivedBy] = useState("Mario")
   const [equipmentType, setEquipmentType] = useState<EquipmentType>("computadora")
   const [brand, setBrand] = useState("")
   const [model, setModel] = useState("")
@@ -60,6 +65,7 @@ export default function NuevoTicketPage() {
   const [savedTicket, setSavedTicket] = useState<Ticket | null>(null)
   const [showPrintDialog, setShowPrintDialog] = useState(false)
   const [showInternalPrint, setShowInternalPrint] = useState(false)
+  const printBundleRef = useRef<TicketFullPrintBundleHandle>(null)
   const [saving, setSaving] = useState(false)
   const [customerExists, setCustomerExists] = useState(false)
 
@@ -117,6 +123,7 @@ export default function NuevoTicketPage() {
   const resetForm = () => {
     setClientName("")
     setClientPhone("")
+    setReceivedBy("Mario")
     setEquipmentType("computadora")
     setBrand("")
     setModel("")
@@ -165,6 +172,7 @@ export default function NuevoTicketPage() {
         body: JSON.stringify({
           client_name: clientName,
           client_phone: clientPhone,
+          received_by: receivedBy.trim() || "Mario",
           equipment_type: equipmentType,
           brand: brand || null,
           model: model || null,
@@ -196,7 +204,9 @@ export default function NuevoTicketPage() {
       setSavedTicket(parsedTicket)
 
       if (openPrintDialog) {
-        setShowPrintDialog(true)
+        window.setTimeout(() => {
+          void printBundleRef.current?.printAll()
+        }, 900)
       } else {
         alert(`Ticket ${ticket.id} creado correctamente`)
         resetForm()
@@ -229,6 +239,19 @@ export default function NuevoTicketPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="receivedBy">Recibió en taller</Label>
+                  <Input
+                    id="receivedBy"
+                    value={receivedBy}
+                    onChange={(e) => setReceivedBy(e.target.value)}
+                    placeholder="Nombre de quien recibe el equipo"
+                    className="h-11 text-base"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Por defecto Mario; cámbielo si recibe otra persona.
+                  </p>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="clientName">Nombre del Cliente *</Label>
                   <Input
@@ -316,12 +339,12 @@ export default function NuevoTicketPage() {
                 <Label htmlFor="devicePassword">Contraseña del equipo</Label>
                 <Input
                   id="devicePassword"
-                  type="password"
-                  autoComplete="new-password"
+                  type="text"
+                  autoComplete="off"
                   value={devicePassword}
                   onChange={(e) => setDevicePassword(e.target.value)}
                   placeholder="Windows, PIN, BIOS… (opcional)"
-                  className="h-12 text-base font-mono"
+                  className="h-12 text-base"
                 />
                 <p className="text-xs text-muted-foreground">
                   Opcional. Queda en el expediente del ticket y en las impresiones del taller.
@@ -435,43 +458,45 @@ export default function NuevoTicketPage() {
             <CardHeader className="pb-4">
               <CardTitle className="text-lg">Información Adicional</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="estimatedDelivery" className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    Fecha Estimada de Entrega
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Por defecto es hoy; cámbiela si la entrega será otro día.
-                  </p>
-                  <Input
-                    id="estimatedDelivery"
-                    type="date"
-                    value={estimatedDeliveryDate}
-                    onChange={(e) => setEstimatedDeliveryDate(e.target.value)}
-                    className="h-12"
-                    min={getLocalDateInputValue()}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="diagnosisCost" className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4" />
-                    Costo de Diagnóstico (L.)
-                  </Label>
-                  <Input
-                    id="diagnosisCost"
-                    type="number"
-                    value={diagnosisCost}
-                    onChange={(e) => setDiagnosisCost(e.target.value)}
-                    placeholder="0.00"
-                    className="h-12"
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-x-6 sm:gap-y-2">
+                <Label
+                  htmlFor="estimatedDelivery"
+                  className="order-1 flex items-center gap-2 text-sm font-medium leading-none sm:order-1"
+                >
+                  <Calendar className="h-4 w-4 shrink-0" />
+                  Fecha Estimada de Entrega
+                </Label>
+                <Label
+                  htmlFor="diagnosisCost"
+                  className="order-3 flex items-center gap-2 text-sm font-medium leading-none sm:order-2"
+                >
+                  <DollarSign className="h-4 w-4 shrink-0" />
+                  Costo de Diagnóstico (L.)
+                </Label>
+                <Input
+                  id="estimatedDelivery"
+                  type="date"
+                  value={estimatedDeliveryDate}
+                  onChange={(e) => setEstimatedDeliveryDate(e.target.value)}
+                  className="order-2 h-12 w-full sm:order-3"
+                  min={getLocalDateInputValue()}
+                />
+                <Input
+                  id="diagnosisCost"
+                  type="number"
+                  value={diagnosisCost}
+                  onChange={(e) => setDiagnosisCost(e.target.value)}
+                  placeholder="0.00"
+                  className="order-4 h-12 w-full sm:order-4"
+                  min="0"
+                  step="0.01"
+                />
+                <p className="order-5 text-xs leading-snug text-muted-foreground sm:col-span-2">
+                  Por defecto la fecha de entrega es hoy; cámbiela si corresponde otro día.
+                </p>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="internalNotes" className="flex items-center gap-2">
                   <FileText className="h-4 w-4" />
@@ -516,49 +541,57 @@ export default function NuevoTicketPage() {
                 ) : (
                   <Printer className="mr-2 h-5 w-5" />
                 )}
-                Guardar e Imprimir
+                Guardar e imprimir todo
               </Button>
             </div>
           ) : (
             <Card className="border-green-500 bg-green-50 dark:bg-green-950">
               <CardContent className="pt-6">
                 <div className="space-y-6">
-                  <div className="flex items-center justify-center gap-2 text-green-700 dark:text-green-400">
-                    <Save className="h-6 w-6" />
-                    <span className="text-lg font-semibold">Ticket {savedTicket.id} guardado</span>
-                  </div>
-                  
-                  {/* Ticket Cliente - Impresora Normal */}
-                  <div className="p-4 bg-background rounded-lg border-2 border-primary">
-                    <div className="text-center mb-3">
-                      <h3 className="font-semibold text-foreground">Para el Cliente</h3>
-                      <p className="text-sm text-muted-foreground">Impresora normal - Media carta</p>
+                  <div className="flex flex-col items-center gap-1 text-green-700 dark:text-green-400">
+                    <div className="flex items-center gap-2">
+                      <Save className="h-6 w-6" />
+                      <span className="text-lg font-semibold">
+                        Ticket N°{" "}
+                        {savedTicket.ticket_seq != null ? savedTicket.ticket_seq : savedTicket.id}{" "}
+                        guardado
+                      </span>
                     </div>
+                    <p className="text-sm text-muted-foreground">
+                      Comprobante, POS, etiqueta de equipo y accesorios (si hay)
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-background rounded-lg border-2 border-primary">
                     <Button
-                      onClick={() => setShowPrintDialog(true)}
+                      onClick={() => void printBundleRef.current?.printAll()}
                       size="lg"
                       className="w-full h-14 text-base bg-primary hover:bg-primary/90"
                     >
-                      <FileText className="mr-2 h-5 w-5" />
-                      Imprimir Orden de Trabajo
-                    </Button>
-                  </div>
-
-                  {/* Uso Interno - POS y Etiquetas */}
-                  <div className="p-4 bg-background rounded-lg border">
-                    <div className="text-center mb-3">
-                      <h3 className="font-semibold text-foreground">Uso Interno del Taller</h3>
-                      <p className="text-sm text-muted-foreground">Impresora POS y etiquetas</p>
-                    </div>
-                    <Button
-                      onClick={() => setShowInternalPrint(true)}
-                      size="lg"
-                      variant="secondary"
-                      className="w-full h-14 text-base"
-                    >
                       <Printer className="mr-2 h-5 w-5" />
-                      Imprimir POS / Etiquetas
+                      Imprimir todo (una tras otra)
                     </Button>
+                    <p className="text-xs text-muted-foreground text-center mt-3">
+                      Cada hoja abre el cuadro de impresión; cierre o imprima y seguirá la siguiente.
+                    </p>
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowPrintDialog(true)}
+                        className="w-full"
+                      >
+                        <FileText className="mr-2 h-4 w-4" />
+                        Solo comprobante cliente
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowInternalPrint(true)}
+                        className="w-full"
+                      >
+                        <Printer className="mr-2 h-4 w-4" />
+                        Solo uso interno
+                      </Button>
+                    </div>
                   </div>
 
                   {/* Nuevo Ticket */}
@@ -580,14 +613,15 @@ export default function NuevoTicketPage() {
       {/* Print Dialogs */}
       {savedTicket && (
         <>
-          <PrintCustomer 
-            ticket={savedTicket} 
-            open={showPrintDialog} 
+          <TicketFullPrintBundle ref={printBundleRef} ticket={savedTicket} />
+          <PrintCustomer
+            ticket={savedTicket}
+            open={showPrintDialog}
             onOpenChange={setShowPrintDialog}
           />
-          <PrintInternal 
-            ticket={savedTicket} 
-            open={showInternalPrint} 
+          <PrintInternal
+            ticket={savedTicket}
+            open={showInternalPrint}
             onOpenChange={setShowInternalPrint}
           />
         </>

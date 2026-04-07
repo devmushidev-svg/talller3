@@ -1,18 +1,22 @@
 "use client"
 
-import { useRef, useEffect, useState } from "react"
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react"
 import { Ticket, ShopSettings, EQUIPMENT_LABELS } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Receipt } from "lucide-react"
 import { QRCodeCanvas } from "qrcode.react"
 
+export type TicketReceiptHandle = { print: () => void }
+
 interface TicketReceiptProps {
   ticket: Ticket
   settings: ShopSettings
   onPrint?: () => void
+  hideTrigger?: boolean
 }
 
-export function TicketReceipt({ ticket, settings, onPrint }: TicketReceiptProps) {
+export const TicketReceipt = forwardRef<TicketReceiptHandle, TicketReceiptProps>(
+  function TicketReceipt({ ticket, settings, onPrint, hideTrigger = false }, ref) {
   const printRef = useRef<HTMLDivElement>(null)
   const [qrDataUrl, setQrDataUrl] = useState<string>("")
 
@@ -26,7 +30,7 @@ export function TicketReceipt({ ticket, settings, onPrint }: TicketReceiptProps)
     return () => clearTimeout(timer)
   }, [ticket.id])
 
-  const handlePrint = () => {
+  const handlePrint = useCallback(() => {
     const printContent = printRef.current
     if (!printContent) return
 
@@ -170,7 +174,9 @@ export function TicketReceipt({ ticket, settings, onPrint }: TicketReceiptProps)
     }, 250)
 
     onPrint?.()
-  }
+  }, [ticket, settings, onPrint, qrDataUrl])
+
+  useImperativeHandle(ref, () => ({ print: handlePrint }), [handlePrint])
 
   const accessories = typeof ticket.accessories === 'string' 
     ? JSON.parse(ticket.accessories) 
@@ -189,10 +195,12 @@ export function TicketReceipt({ ticket, settings, onPrint }: TicketReceiptProps)
 
   return (
     <div className="space-y-4">
-      <Button onClick={handlePrint} variant="outline" className="w-full">
-        <Receipt className="mr-2 h-4 w-4" />
-        Imprimir Ticket POS ({settings.printer_width || '80mm'})
-      </Button>
+      {!hideTrigger && (
+        <Button onClick={handlePrint} variant="outline" className="w-full">
+          <Receipt className="mr-2 h-4 w-4" />
+          Imprimir Ticket POS ({settings.printer_width || '80mm'})
+        </Button>
+      )}
 
       {/* Hidden QR Canvas */}
       <div className="hidden">
@@ -289,4 +297,4 @@ export function TicketReceipt({ ticket, settings, onPrint }: TicketReceiptProps)
       </div>
     </div>
   )
-}
+})

@@ -40,11 +40,29 @@ export async function POST(request: Request) {
   }
 
   const ticketId = `TK-${Date.now().toString(36).toUpperCase()}`
-  
+
+  let nextSeq = 1
+  const { data: lastSeqRow } = await supabase
+    .from("tickets")
+    .select("ticket_seq")
+    .not("ticket_seq", "is", null)
+    .order("ticket_seq", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (lastSeqRow?.ticket_seq != null) {
+    nextSeq = lastSeqRow.ticket_seq + 1
+  }
+
+  const receivedBy =
+    typeof body.received_by === "string" && body.received_by.trim()
+      ? body.received_by.trim()
+      : "Mario"
+
   const { data, error } = await supabase
     .from("tickets")
     .insert({
       id: ticketId,
+      ticket_seq: nextSeq,
       client_name,
       client_phone,
       equipment_type: body.equipment_type,
@@ -52,6 +70,7 @@ export async function POST(request: Request) {
       model: body.model || null,
       serial_number: body.serial_number || null,
       device_password: body.device_password?.trim() || null,
+      received_by: receivedBy,
       problem_description: body.problem_description,
       accessories: JSON.stringify(body.accessories || []),
       status: "recibido",

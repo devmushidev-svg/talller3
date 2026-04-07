@@ -54,6 +54,8 @@ export async function PATCH(
   if (body.parts_used) {
     updateData.parts_used = JSON.stringify(body.parts_used)
   }
+
+  delete updateData.ticket_seq
   
   const { data, error } = await supabase
     .from("tickets")

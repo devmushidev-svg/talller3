@@ -1,18 +1,22 @@
 "use client"
 
-import { useRef, useEffect, useState } from "react"
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react"
 import { Ticket, ShopSettings } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Tag } from "lucide-react"
 import { QRCodeCanvas } from "qrcode.react"
 
+export type DeviceLabelHandle = { print: () => void }
+
 interface DeviceLabelProps {
   ticket: Ticket
   settings: ShopSettings
   onPrint?: () => void
+  hideTrigger?: boolean
 }
 
-export function DeviceLabel({ ticket, settings, onPrint }: DeviceLabelProps) {
+export const DeviceLabel = forwardRef<DeviceLabelHandle, DeviceLabelProps>(
+  function DeviceLabel({ ticket, settings, onPrint, hideTrigger = false }, ref) {
   const printRef = useRef<HTMLDivElement>(null)
   const [qrDataUrl, setQrDataUrl] = useState<string>("")
 
@@ -26,7 +30,7 @@ export function DeviceLabel({ ticket, settings, onPrint }: DeviceLabelProps) {
     return () => clearTimeout(timer)
   }, [ticket.id])
 
-  const handlePrint = () => {
+  const handlePrint = useCallback(() => {
     const printContent = printRef.current
     if (!printContent) return
 
@@ -146,7 +150,9 @@ export function DeviceLabel({ ticket, settings, onPrint }: DeviceLabelProps) {
     }, 250)
 
     onPrint?.()
-  }
+  }, [ticket, settings, onPrint, qrDataUrl])
+
+  useImperativeHandle(ref, () => ({ print: handlePrint }), [handlePrint])
 
   const formattedDate = new Date(ticket.created_at || Date.now()).toLocaleDateString('es-HN', {
     day: '2-digit',
@@ -156,10 +162,12 @@ export function DeviceLabel({ ticket, settings, onPrint }: DeviceLabelProps) {
 
   return (
     <div className="space-y-4">
-      <Button onClick={handlePrint} variant="outline" className="w-full">
-        <Tag className="mr-2 h-4 w-4" />
-        Imprimir Etiqueta Equipo
-      </Button>
+      {!hideTrigger && (
+        <Button onClick={handlePrint} variant="outline" className="w-full">
+          <Tag className="mr-2 h-4 w-4" />
+          Imprimir Etiqueta Equipo
+        </Button>
+      )}
 
       {/* Hidden QR Canvas for data URL generation */}
       <div className="hidden">
@@ -196,4 +204,4 @@ export function DeviceLabel({ ticket, settings, onPrint }: DeviceLabelProps) {
       </div>
     </div>
   )
-}
+})

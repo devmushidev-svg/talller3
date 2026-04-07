@@ -11,12 +11,16 @@ export type PaymentStatus = 'pendiente' | 'parcial' | 'pagado'
 
 export interface Ticket {
   id: string
+  /** Número correlativo simple para mostrar al cliente (1, 2, 3…) */
+  ticket_seq?: number | null
   created_at: string
   updated_at: string
   delivered_at?: string | null
   estimated_delivery_date?: string | null
   client_name: string
   client_phone: string
+  /** Quien recibió el equipo en taller (p. ej. recepción) */
+  received_by?: string | null
   equipment_type: EquipmentType
   brand?: string | null
   model?: string | null

@@ -1,11 +1,15 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Ticket, ShopSettings } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Printer, FileText, Check } from "lucide-react"
 import { CustomerTicket } from "./customer-ticket"
+import {
+  TicketFullPrintBundle,
+  type TicketFullPrintBundleHandle,
+} from "./ticket-full-print-bundle"
 
 interface PrintCustomerProps {
   ticket: Ticket
@@ -22,6 +26,7 @@ export function PrintCustomer({ ticket, open, onOpenChange }: PrintCustomerProps
     printer_width: '80mm'
   })
   const [printed, setPrinted] = useState(false)
+  const printBundleRef = useRef<TicketFullPrintBundleHandle>(null)
 
   useEffect(() => {
     fetch('/api/settings')
@@ -46,17 +51,29 @@ export function PrintCustomer({ ticket, open, onOpenChange }: PrintCustomerProps
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Orden de Trabajo - Cliente
+            Comprobante para cliente
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
+          <TicketFullPrintBundle ref={printBundleRef} ticket={ticket} />
+          <Button
+            className="w-full h-11"
+            onClick={() => void printBundleRef.current?.printAll()}
+          >
+            <Printer className="mr-2 h-4 w-4" />
+            Imprimir todo (cliente + POS + etiquetas)
+          </Button>
+
           <div className="p-4 bg-muted rounded-lg text-center">
             <p className="text-sm text-muted-foreground mb-2">
-              Ticket <span className="font-mono font-bold">{ticket.id}</span>
+              Ticket N°{" "}
+              <span className="font-bold">
+                {ticket.ticket_seq != null ? ticket.ticket_seq : ticket.id}
+              </span>
             </p>
             <p className="text-sm text-muted-foreground">
-              Imprime en hoja tamaño media carta para entregar al cliente
+              Abajo puede imprimir solo el comprobante en media carta.
             </p>
           </div>
 

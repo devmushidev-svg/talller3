@@ -816,7 +816,7 @@ export default function TicketsActivosPage() {
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Button onClick={() => handleCustomerPrint(selectedTicket)} className="h-12">
                       <Printer className="mr-2 h-4 w-4" />
-                      Orden de Trabajo (Cliente)
+                      Comprobante (cliente)
                     </Button>
                     <Button variant="secondary" onClick={() => handleInternalPrint(selectedTicket)} className="h-12">
                       <Tag className="mr-2 h-4 w-4" />
