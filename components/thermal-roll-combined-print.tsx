@@ -266,10 +266,14 @@ export const ThermalRollCombinedPrint = forwardRef<ThermalRollCombinedHandle, Pr
           )
           .join("")}`
 
+      // "size: Xm auto" → una sola página continua ("1 de 1" en vista previa). Altura fija fuerza
+      // hojas distintas entre comprobante / POS / equipo / accesorios. Subir si algo se corta.
+      const pageHeight = "220mm"
       const css = `
-          @page { size: ${width} auto; margin: 1mm; }
+          @page { size: ${width} ${pageHeight}; margin: 1mm; }
           * { margin: 0; padding: 0; box-sizing: border-box; }
-          body {
+          html, body {
+            height: auto;
             font-family: 'Arial Black', 'Arial', sans-serif;
             color: #000;
             background: #fff;
@@ -278,7 +282,13 @@ export const ThermalRollCombinedPrint = forwardRef<ThermalRollCombinedHandle, Pr
           .thermal-page {
             page-break-after: always;
             break-after: page;
+            page-break-inside: avoid;
+            break-inside: avoid;
             padding-bottom: 2mm;
+          }
+          .thermal-page + .thermal-page {
+            page-break-before: always;
+            break-before: page;
           }
           .thermal-page:last-child {
             page-break-after: auto;
