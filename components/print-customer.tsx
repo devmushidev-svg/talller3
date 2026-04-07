@@ -62,7 +62,7 @@ export function PrintCustomer({ ticket, open, onOpenChange }: PrintCustomerProps
             onClick={() => void printBundleRef.current?.printAll()}
           >
             <Printer className="mr-2 h-4 w-4" />
-            Imprimir todo en térmica (una vez)
+            Imprimir todo en térmica (varios trabajos seguidos)
           </Button>
 
           <div className="p-4 bg-muted rounded-lg text-center">

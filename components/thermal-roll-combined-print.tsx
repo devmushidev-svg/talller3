@@ -45,8 +45,11 @@ function formatPrintDateOnly(iso?: string | null) {
 }
 
 export type ThermalRollCombinedHandle = {
-  /** Un solo diálogo: comprobante cliente + POS + etiqueta equipo + accesorios (página cada uno). */
-  printThermalRoll: () => void
+  /**
+   * Varios cuadros de impresión seguidos (un bloque por trabajo): comprobante → POS → equipo → cada accesorio.
+   * Muchas térmicas no cortan con `page-break`; trabajos separados suelen disparar corte/avance.
+   */
+  printThermalRoll: () => Promise<void>
 }
 
 type Props = {
@@ -74,7 +77,7 @@ export const ThermalRollCombinedPrint = forwardRef<ThermalRollCombinedHandle, Pr
       return () => clearTimeout(t)
     }, [safeId, ticket.id])
 
-    const printThermalRoll = useCallback(() => {
+    const printThermalRoll = useCallback(async () => {
       const width = settings.printer_width === "58mm" ? "58mm" : "80mm"
       const accessories =
         typeof ticket.accessories === "string"
@@ -250,27 +253,20 @@ export const ThermalRollCombinedPrint = forwardRef<ThermalRollCombinedHandle, Pr
           </div>
         </div>`
 
-      const rollPages = `
-        <div class="thermal-page">${customerThermalBody}</div>
-        <div class="thermal-page">${receiptBody}</div>
-        <div class="thermal-page">${deviceBody}</div>
-        ${accList
-          .map(
-            (acc: string) => `<div class="thermal-page">
+      const accBodies = accList.map(
+        (acc: string) => `
         <div class="acc-label">
           <div class="acc-ticket-id">${ticketIdFull}</div>
           <div class="acc-name">${escapeHtml(acc)}</div>
           <div class="acc-client">${escapeHtml(ticket.client_name)}</div>
-        </div>
-      </div>`
-          )
-          .join("")}`
+        </div>`
+      )
 
-      // "size: Xm auto" → una sola página continua ("1 de 1" en vista previa). Altura fija fuerza
-      // hojas distintas entre comprobante / POS / equipo / accesorios. Subir si algo se corta.
-      const pageHeight = "220mm"
+      const sectionBodies = [customerThermalBody, receiptBody, deviceBody, ...accBodies]
+
+      // Un documento por trabajo: @page auto para una sola tira corta por impresión (mejor para cortadoras).
       const css = `
-          @page { size: ${width} ${pageHeight}; margin: 1mm; }
+          @page { size: ${width} auto; margin: 1mm; }
           * { margin: 0; padding: 0; box-sizing: border-box; }
           html, body {
             height: auto;
@@ -278,21 +274,6 @@ export const ThermalRollCombinedPrint = forwardRef<ThermalRollCombinedHandle, Pr
             color: #000;
             background: #fff;
             font-weight: bold;
-          }
-          .thermal-page {
-            page-break-after: always;
-            break-after: page;
-            page-break-inside: avoid;
-            break-inside: avoid;
-            padding-bottom: 2mm;
-          }
-          .thermal-page + .thermal-page {
-            page-break-before: always;
-            break-before: page;
-          }
-          .thermal-page:last-child {
-            page-break-after: auto;
-            break-after: auto;
           }
           /* ——— Recibo POS ——— */
           .receipt { padding: 2mm; width: 100%; font-size: 12px; line-height: 1.4; }
@@ -355,37 +336,48 @@ export const ThermalRollCombinedPrint = forwardRef<ThermalRollCombinedHandle, Pr
           .cust-disclaimer { font-size: 7px; text-align: center; margin-top: 3mm; padding-top: 2mm; border-top: 1px solid #000; font-weight: bold; }
       `
 
-      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Térmica ${ticket.id}</title><style>${css}</style></head><body>${rollPages}</body></html>`
+      const printDelayMs = 280
+      const afterPrintMs = 1300
 
-      const iframe = document.createElement("iframe")
-      iframe.style.position = "fixed"
-      iframe.style.right = "0"
-      iframe.style.bottom = "0"
-      iframe.style.width = "0"
-      iframe.style.height = "0"
-      iframe.style.border = "none"
-      document.body.appendChild(iframe)
+      const runOnePrintJob = (bodyHtml: string, jobIndex: number) =>
+        new Promise<void>((resolve) => {
+          const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Térmica ${ticket.id} (${jobIndex + 1}/${sectionBodies.length})</title><style>${css}</style></head><body>${bodyHtml}</body></html>`
+          const iframe = document.createElement("iframe")
+          iframe.style.position = "fixed"
+          iframe.style.right = "0"
+          iframe.style.bottom = "0"
+          iframe.style.width = "0"
+          iframe.style.height = "0"
+          iframe.style.border = "none"
+          document.body.appendChild(iframe)
 
-      const doc = iframe.contentDocument || iframe.contentWindow?.document
-      if (!doc) {
-        document.body.removeChild(iframe)
-        return
+          const doc = iframe.contentDocument || iframe.contentWindow?.document
+          if (!doc) {
+            iframe.remove()
+            resolve()
+            return
+          }
+          doc.open()
+          doc.write(html)
+          doc.close()
+
+          window.setTimeout(() => {
+            try {
+              iframe.contentWindow?.focus()
+              iframe.contentWindow?.print()
+            } catch (e) {
+              console.error("Print error:", e)
+            }
+            window.setTimeout(() => {
+              iframe.remove()
+              resolve()
+            }, afterPrintMs)
+          }, printDelayMs)
+        })
+
+      for (let i = 0; i < sectionBodies.length; i++) {
+        await runOnePrintJob(sectionBodies[i], i)
       }
-      doc.open()
-      doc.write(html)
-      doc.close()
-
-      setTimeout(() => {
-        try {
-          iframe.contentWindow?.focus()
-          iframe.contentWindow?.print()
-        } catch (e) {
-          console.error("Print error:", e)
-        }
-        setTimeout(() => {
-          if (iframe.parentNode) document.body.removeChild(iframe)
-        }, 1000)
-      }, 280)
     }, [ticket, settings, qrReceipt, qrDevice])
 
     useImperativeHandle(ref, () => ({ printThermalRoll }), [printThermalRoll])

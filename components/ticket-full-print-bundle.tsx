@@ -29,7 +29,7 @@ function sleep(ms: number) {
 }
 
 export type TicketFullPrintBundleHandle = {
-  /** Un solo cuadro de impresión: comprobante + POS + equipo + accesorios (páginas para cortar). */
+  /** Varios trabajos de impresión en fila (mejor para cortar en térmica). */
   printAll: () => Promise<void>
 }
 
@@ -58,7 +58,7 @@ export const TicketFullPrintBundle = forwardRef<
 
   const printAll = useCallback(async () => {
     await sleep(QR_WARMUP_MS)
-    thermalRef.current?.printThermalRoll()
+    await thermalRef.current?.printThermalRoll()
   }, [])
 
   useImperativeHandle(ref, () => ({ printAll }), [printAll])

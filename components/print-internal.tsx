@@ -79,7 +79,7 @@ export function PrintInternal({ ticket, open, onOpenChange }: PrintInternalProps
             Imprimir todo en orden
           </Button>
           <p className="text-xs text-muted-foreground text-center -mt-2">
-            Un solo cuadro de impresión: comprobante, ticket POS, etiqueta de equipo y accesorios (si hay), cada bloque en página aparte para cortar.
+            Al imprimir todo se abren varios cuadros seguidos (comprobante, POS, equipo, accesorios) para que la térmica pueda cortar entre trabajos.
           </p>
 
           {/* POS Receipt */}
