@@ -12,30 +12,32 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   ClipboardList,
   Loader2,
   ChevronDown,
+  ChevronRight,
   Package,
   CheckCircle,
   Truck,
-  Pencil,
   PlusCircle,
   BarChart3,
+  Smartphone,
 } from "lucide-react"
 import {
   Ticket,
+  TicketStatus,
   STATUS_COLORS,
   STATUS_LABELS,
   EQUIPMENT_LABELS,
 } from "@/lib/types"
+import { cn } from "@/lib/utils"
 
 function parseTicket(t: Ticket): Ticket {
   return {
@@ -48,6 +50,14 @@ function parseTicket(t: Ticket): Ticket {
       typeof t.photos === "string" ? JSON.parse(t.photos as string) : t.photos || [],
   }
 }
+
+const statusFlow: TicketStatus[] = [
+  "recibido",
+  "en_diagnostico",
+  "en_reparacion",
+  "listo",
+  "entregado",
+]
 
 interface Stats {
   receivedToday: number
@@ -66,6 +76,8 @@ interface Stats {
 export default function DashboardPage() {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [ticketsLoading, setTicketsLoading] = useState(true)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [statusSavingId, setStatusSavingId] = useState<string | null>(null)
   const [statsOpen, setStatsOpen] = useState(false)
   const [stats, setStats] = useState<Stats | null>(null)
   const [statsLoading, setStatsLoading] = useState(false)
@@ -108,6 +120,34 @@ export default function DashboardPage() {
       cancelled = true
     }
   }, [statsOpen, stats])
+
+  const handleStatusChange = async (ticketId: string, newStatus: TicketStatus) => {
+    setStatusSavingId(ticketId)
+    try {
+      const update: Record<string, unknown> = { status: newStatus }
+      if (newStatus === "entregado") {
+        update.delivered_at = new Date().toISOString()
+      }
+      const res = await fetch(`/api/tickets/${ticketId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(update),
+      })
+      if (!res.ok) throw new Error("No se pudo actualizar")
+      setTickets((prev) => {
+        if (newStatus === "entregado") return prev.filter((t) => t.id !== ticketId)
+        return prev.map((t) => (t.id === ticketId ? { ...t, status: newStatus } : t))
+      })
+      if (newStatus === "entregado") {
+        setExpandedId((e) => (e === ticketId ? null : e))
+      }
+    } catch (e) {
+      console.error(e)
+      alert("No se pudo cambiar el estado")
+    } finally {
+      setStatusSavingId(null)
+    }
+  }
 
   const todayCards = stats
     ? [
@@ -152,6 +192,13 @@ export default function DashboardPage() {
       year: "numeric",
     })
 
+  const toggleExpand = (id: string) => {
+    setExpandedId((prev) => (prev === id ? null : id))
+  }
+
+  const accList = (t: Ticket) =>
+    Array.isArray(t.accessories) ? t.accessories.filter(Boolean) : []
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -159,7 +206,7 @@ export default function DashboardPage() {
           <div>
             <h1 className="text-2xl font-bold text-foreground">Inicio</h1>
             <p className="text-muted-foreground">
-              Tickets activos — del más nuevo al más antiguo
+              Tickets activos (más nuevos arriba). Toca una tarjeta para el detalle y el estado.
             </p>
           </div>
           <Button asChild className="w-full shrink-0 sm:w-auto">
@@ -170,12 +217,12 @@ export default function DashboardPage() {
           </Button>
         </div>
 
-        <Card className="border-border">
+        <Card className="border-border shadow-sm">
           <CardHeader className="pb-3">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
                 <ClipboardList className="h-5 w-5" />
-                Equipos en taller
+                En taller
                 {!ticketsLoading && (
                   <Badge variant="secondary" className="font-normal">
                     {tickets.length} activo{tickets.length !== 1 ? "s" : ""}
@@ -183,84 +230,179 @@ export default function DashboardPage() {
                 )}
               </CardTitle>
               <Button variant="outline" size="sm" asChild>
-                <Link href="/tickets-activos">Buscar y filtros avanzados</Link>
+                <Link href="/tickets-activos">Lista completa y filtros</Link>
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="pt-0">
             {ticketsLoading ? (
               <div className="flex items-center justify-center py-16">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             ) : tickets.length === 0 ? (
-              <div className="px-6 py-12 text-center text-muted-foreground">
+              <div className="py-12 text-center text-muted-foreground">
                 <p className="mb-3">No hay tickets activos.</p>
                 <Button asChild>
                   <Link href="/nuevo-ticket">Crear el primero</Link>
                 </Button>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-28">Ticket</TableHead>
-                      <TableHead>Cliente</TableHead>
-                      <TableHead className="hidden sm:table-cell">Equipo</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead className="hidden md:table-cell">Ingreso</TableHead>
-                      <TableHead className="w-36 text-right">Acción</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {tickets.map((ticket) => (
-                      <TableRow key={ticket.id} className="hover:bg-muted/40">
-                        <TableCell className="font-mono text-sm font-semibold">
-                          {displayId(ticket)}
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{ticket.client_name}</p>
-                            <p className="text-xs text-muted-foreground">{ticket.client_phone}</p>
+              <div className="flex flex-col gap-4 max-w-2xl mx-auto">
+                {tickets.map((ticket) => {
+                  const open = expandedId === ticket.id
+                  return (
+                    <div
+                      key={ticket.id}
+                      className={cn(
+                        "rounded-2xl border bg-card text-left shadow-md transition-all duration-200",
+                        open
+                          ? "border-primary/40 shadow-lg ring-2 ring-primary/20"
+                          : "hover:border-primary/30 hover:shadow-lg"
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleExpand(ticket.id)}
+                        className="flex w-full gap-3 p-4 sm:p-5 text-left rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      >
+                        <div
+                          className={cn(
+                            "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border bg-muted/50 transition-transform",
+                            open && "rotate-90"
+                          )}
+                        >
+                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-sm font-bold text-primary">
+                              {displayId(ticket)}
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] border-0 px-2 py-0"
+                              style={{
+                                backgroundColor: `${STATUS_COLORS[ticket.status]}18`,
+                                color: STATUS_COLORS[ticket.status],
+                              }}
+                            >
+                              {STATUS_LABELS[ticket.status]}
+                            </Badge>
+                            <Badge variant="secondary" className="text-xs font-medium">
+                              {EQUIPMENT_LABELS[ticket.equipment_type] ?? ticket.equipment_type}
+                            </Badge>
                           </div>
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell text-sm">
-                          {EQUIPMENT_LABELS[ticket.equipment_type] ?? ticket.equipment_type}
-                          {(ticket.brand || ticket.model) && (
-                            <p className="text-xs text-muted-foreground">
-                              {[ticket.brand, ticket.model].filter(Boolean).join(" · ")}
+                          <div>
+                            <p className="font-semibold text-base leading-tight">
+                              {ticket.client_name}
+                            </p>
+                            <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                              <Smartphone className="h-3.5 w-3.5 shrink-0" />
+                              {ticket.client_phone}
+                            </p>
+                          </div>
+                          <p className="text-sm text-foreground/90 line-clamp-3 leading-snug border-l-2 border-border pl-3">
+                            {ticket.problem_description || "Sin descripción del problema."}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {open ? "Ocultar detalle" : "Tocar para estado y más datos"}
+                          </p>
+                        </div>
+                      </button>
+
+                      {open && (
+                        <div className="border-t border-border/80 px-4 pb-4 pt-3 sm:px-5 sm:pb-5 space-y-4">
+                          <div className="grid gap-2 text-sm sm:grid-cols-2">
+                            <p>
+                              <span className="text-muted-foreground">Marca / modelo</span>
+                              <br />
+                              <span className="font-medium">
+                                {[ticket.brand, ticket.model].filter(Boolean).join(" · ") || "—"}
+                              </span>
+                            </p>
+                            <p>
+                              <span className="text-muted-foreground">Ingreso</span>
+                              <br />
+                              <span className="font-medium">
+                                {ticket.created_at ? formatDate(ticket.created_at) : "—"}
+                              </span>
+                            </p>
+                            {ticket.estimated_delivery_date && (
+                              <p>
+                                <span className="text-muted-foreground">Entrega est.</span>
+                                <br />
+                                <span className="font-medium">
+                                  {formatDate(ticket.estimated_delivery_date)}
+                                </span>
+                              </p>
+                            )}
+                            {ticket.serial_number && (
+                              <p>
+                                <span className="text-muted-foreground">Serie</span>
+                                <br />
+                                <span className="font-mono font-medium">{ticket.serial_number}</span>
+                              </p>
+                            )}
+                          </div>
+
+                          {accList(ticket).length > 0 && (
+                            <p className="text-sm">
+                              <span className="text-muted-foreground">Accesorios: </span>
+                              {accList(ticket).join(", ")}
                             </p>
                           )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className="text-xs border-0"
-                            style={{
-                              backgroundColor: `${STATUS_COLORS[ticket.status]}22`,
-                              color: STATUS_COLORS[ticket.status],
-                            }}
-                          >
-                            {STATUS_LABELS[ticket.status]}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                          {ticket.created_at ? formatDate(ticket.created_at) : "—"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button size="sm" asChild>
+
+                          {ticket.internal_notes && (
+                            <p className="text-xs text-muted-foreground rounded-md bg-muted/50 p-2">
+                              <span className="font-medium text-foreground/80">Notas internas: </span>
+                              {ticket.internal_notes}
+                            </p>
+                          )}
+
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Estado del ticket</label>
+                            <Select
+                              value={ticket.status}
+                              disabled={statusSavingId === ticket.id}
+                              onValueChange={(v) =>
+                                void handleStatusChange(ticket.id, v as TicketStatus)
+                              }
+                            >
+                              <SelectTrigger className="h-11 w-full max-w-md">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {statusFlow.map((st) => (
+                                  <SelectItem key={st} value={st}>
+                                    {STATUS_LABELS[st]}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {statusSavingId === ticket.id && (
+                              <p className="text-xs text-muted-foreground flex items-center gap-2">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                Guardando…
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              Si marca <strong className="text-foreground">Entregado</strong>, el
+                              ticket sale de esta lista (sigue en historial).
+                            </p>
+                          </div>
+
+                          <Button variant="outline" className="w-full sm:w-auto" asChild>
                             <Link
                               href={`/tickets-activos?ticketId=${encodeURIComponent(ticket.id)}`}
                             >
-                              <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                              Actualizar
+                              Abrir ficha completa (costos, fotos, imprimir…)
                             </Link>
                           </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )}
           </CardContent>
