@@ -55,6 +55,7 @@ import { QRScanner } from "@/components/qr-scanner"
 import { CustomerHistory } from "@/components/customer-history"
 import { PrintCustomer } from "@/components/print-customer"
 import { PrintInternal } from "@/components/print-internal"
+import { formatDateOnlyForDisplay } from "@/lib/date-utils"
 
 const statusOptions: TicketStatus[] = [
   "recibido",
@@ -288,13 +289,7 @@ export default function TicketsActivosPage() {
     }
   }
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("es-MX", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    })
-  }
+  const formatDate = (dateStr: string) => formatDateOnlyForDisplay(dateStr, "es-MX")
 
   const clearFilters = () => {
     setStatusFilter("all")

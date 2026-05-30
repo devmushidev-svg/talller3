@@ -9,6 +9,7 @@ import {
 } from "react"
 import { QRCodeCanvas } from "qrcode.react"
 import type { Ticket, ShopSettings } from "@/lib/types"
+import { formatDateOnlyForDisplay } from "@/lib/date-utils"
 import {
   ACCESSORY_CHECKBOX_LABELS,
   EQUIPMENT_LABELS,
@@ -36,12 +37,7 @@ function formatReceiptDate(dateStr?: string) {
 }
 
 function formatPrintDateOnly(iso?: string | null) {
-  if (!iso) return "—"
-  return new Date(iso).toLocaleDateString("es-HN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  })
+  return formatDateOnlyForDisplay(iso, "es-HN")
 }
 
 export type ThermalRollCombinedHandle = {
@@ -49,7 +45,7 @@ export type ThermalRollCombinedHandle = {
    * Varios cuadros de impresión seguidos (un bloque por trabajo): comprobante → POS → equipo → cada accesorio.
    * Muchas térmicas no cortan con `page-break`; trabajos separados suelen disparar corte/avance.
    */
-  printThermalRoll: () => Promise<void>
+  printThermalRoll: (options?: { includeCustomerReceipt?: boolean }) => Promise<void>
 }
 
 type Props = {
@@ -77,7 +73,8 @@ export const ThermalRollCombinedPrint = forwardRef<ThermalRollCombinedHandle, Pr
       return () => clearTimeout(t)
     }, [safeId, ticket.id])
 
-    const printThermalRoll = useCallback(async () => {
+    const printThermalRoll = useCallback(async (options?: { includeCustomerReceipt?: boolean }) => {
+      const includeCustomerReceipt = options?.includeCustomerReceipt ?? true
       const width = settings.printer_width === "58mm" ? "58mm" : "80mm"
       const accessories =
         typeof ticket.accessories === "string"
@@ -159,7 +156,7 @@ export const ThermalRollCombinedPrint = forwardRef<ThermalRollCombinedHandle, Pr
             ticket.estimated_delivery_date
               ? `<div class="divider"></div>
           <div class="row"><span class="label">Entrega Est.:</span> ${escapeHtml(
-            new Date(ticket.estimated_delivery_date).toLocaleDateString("es-HN")
+            formatPrintDateOnly(ticket.estimated_delivery_date)
           )}</div>`
               : ""
           }
@@ -262,7 +259,12 @@ export const ThermalRollCombinedPrint = forwardRef<ThermalRollCombinedHandle, Pr
         </div>`
       )
 
-      const sectionBodies = [customerThermalBody, receiptBody, deviceBody, ...accBodies]
+      const sectionBodies = [
+        ...(includeCustomerReceipt ? [customerThermalBody] : []),
+        receiptBody,
+        deviceBody,
+        ...accBodies,
+      ]
 
       // Un documento por trabajo: @page auto para una sola tira corta por impresión (mejor para cortadoras).
       const css = `

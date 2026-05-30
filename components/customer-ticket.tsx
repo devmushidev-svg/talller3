@@ -1,6 +1,7 @@
 "use client"
 
 import { forwardRef, useCallback, useImperativeHandle, useRef } from "react"
+import { formatDateOnlyForDisplay } from "@/lib/date-utils"
 import {
   Ticket,
   ShopSettings,
@@ -22,12 +23,7 @@ interface CustomerTicketProps {
 }
 
 function formatPrintDate(iso?: string | null) {
-  if (!iso) return "—"
-  return new Date(iso).toLocaleDateString("es-HN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  })
+  return formatDateOnlyForDisplay(iso, "es-HN")
 }
 
 export const CustomerTicket = forwardRef<CustomerTicketHandle, CustomerTicketProps>(

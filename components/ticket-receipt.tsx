@@ -5,6 +5,7 @@ import { Ticket, ShopSettings, EQUIPMENT_LABELS } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Receipt } from "lucide-react"
 import { QRCodeCanvas } from "qrcode.react"
+import { formatDateOnlyForDisplay } from "@/lib/date-utils"
 
 export type TicketReceiptHandle = { print: () => void }
 
@@ -268,15 +269,15 @@ export const TicketReceipt = forwardRef<TicketReceiptHandle, TicketReceiptProps>
             <>
               <div className="divider"></div>
               <div className="row">
-                <span className="label">Entrega Est.:</span> {new Date(ticket.estimated_delivery_date).toLocaleDateString('es-HN')}
+                <span className="label">Entrega Est.:</span> {formatDateOnlyForDisplay(ticket.estimated_delivery_date, 'es-HN')}
               </div>
             </>
           )}
 
           {/* Diagnosis Cost */}
-          {ticket.diagnosis_cost > 0 && (
+          {(ticket.diagnosis_cost ?? 0) > 0 && (
             <div className="row">
-              <span className="label">Diagnóstico:</span> L. {ticket.diagnosis_cost.toFixed(2)}
+              <span className="label">Diagnóstico:</span> L. {(ticket.diagnosis_cost ?? 0).toFixed(2)}
             </div>
           )}
 

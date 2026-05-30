@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Ticket, EQUIPMENT_LABELS } from "@/lib/types"
 import { Search, Eye, Loader2 } from "lucide-react"
+import { formatDateOnlyForDisplay } from "@/lib/date-utils"
 
 export default function HistorialPage() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -72,13 +73,7 @@ export default function HistorialPage() {
     )
   })
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("es-MX", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    })
-  }
+  const formatDate = (dateStr: string) => formatDateOnlyForDisplay(dateStr, "es-MX")
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("es-MX", {

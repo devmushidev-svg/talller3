@@ -38,6 +38,7 @@ import {
   EQUIPMENT_LABELS,
 } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { formatDateOnlyForDisplay } from "@/lib/date-utils"
 
 function parseTicket(t: Ticket): Ticket {
   return {
@@ -185,12 +186,7 @@ export default function DashboardPage() {
   const displayId = (t: Ticket) =>
     t.ticket_seq != null ? `N° ${t.ticket_seq}` : t.id
 
-  const formatDate = (s: string) =>
-    new Date(s).toLocaleDateString("es-HN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    })
+  const formatDate = (s: string) => formatDateOnlyForDisplay(s, "es-HN")
 
   const toggleExpand = (id: string) => {
     setExpandedId((prev) => (prev === id ? null : id))
