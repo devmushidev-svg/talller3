@@ -9,6 +9,7 @@ import {
   useState,
 } from "react"
 import type { Ticket, ShopSettings } from "@/lib/types"
+import { CustomerTicket, type CustomerTicketHandle } from "./customer-ticket"
 import {
   ThermalRollCombinedPrint,
   type ThermalRollCombinedHandle,
@@ -35,14 +36,20 @@ export type TicketFullPrintBundleHandle = {
 
 type TicketFullPrintBundleProps = {
   ticket: Ticket
+  /**
+   * "thermal" conserva el comprobante compacto en rollo.
+   * "full" imprime primero el comprobante de cliente tipo historial/media carta.
+   */
+  customerLayout?: "thermal" | "full"
 }
 
 export const TicketFullPrintBundle = forwardRef<
   TicketFullPrintBundleHandle,
   TicketFullPrintBundleProps
->(function TicketFullPrintBundle({ ticket }, ref) {
+>(function TicketFullPrintBundle({ ticket, customerLayout = "thermal" }, ref) {
   const [settings, setSettings] = useState<ShopSettings>(defaultSettings)
 
+  const customerTicketRef = useRef<CustomerTicketHandle>(null)
   const thermalRef = useRef<ThermalRollCombinedHandle>(null)
 
   useEffect(() => {
@@ -58,8 +65,16 @@ export const TicketFullPrintBundle = forwardRef<
 
   const printAll = useCallback(async () => {
     await sleep(QR_WARMUP_MS)
+
+    if (customerLayout === "full") {
+      customerTicketRef.current?.print()
+      await sleep(400)
+      await thermalRef.current?.printThermalRoll({ includeCustomerReceipt: false })
+      return
+    }
+
     await thermalRef.current?.printThermalRoll()
-  }, [])
+  }, [customerLayout])
 
   useImperativeHandle(ref, () => ({ printAll }), [printAll])
 
@@ -68,6 +83,14 @@ export const TicketFullPrintBundle = forwardRef<
       className="pointer-events-none fixed left-[-10000px] top-0 w-[480px] opacity-0"
       aria-hidden
     >
+      {customerLayout === "full" && (
+        <CustomerTicket
+          ref={customerTicketRef}
+          ticket={ticket}
+          settings={settings}
+          hideTrigger
+        />
+      )}
       <ThermalRollCombinedPrint
         ref={thermalRef}
         ticket={ticket}

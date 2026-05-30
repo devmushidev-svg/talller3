@@ -25,19 +25,12 @@ import {
 } from "@/lib/types"
 import { Save, Printer, Loader2, Calendar, DollarSign, FileText, Plus, X } from "lucide-react"
 import { PhotoUpload } from "@/components/photo-upload"
+import { getLocalDateInputValue, getTomorrowDateInputValue } from "@/lib/date-utils"
 import { CustomerHistory } from "@/components/customer-history"
 import {
   TicketFullPrintBundle,
   type TicketFullPrintBundleHandle,
 } from "@/components/ticket-full-print-bundle"
-
-/** Valor para <input type="date"> en hora local (evita desfase UTC). */
-function getLocalDateInputValue(date = new Date()) {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, "0")
-  const day = String(date.getDate()).padStart(2, "0")
-  return `${y}-${m}-${day}`
-}
 
 export default function NuevoTicketPage() {
   const [clientName, setClientName] = useState("")
@@ -51,9 +44,9 @@ export default function NuevoTicketPage() {
   const [accessories, setAccessories] = useState<string[]>([])
   const [otherAccessoryInput, setOtherAccessoryInput] = useState("")
   
-  // New fields — entrega estimada: hoy por defecto
+  // New fields — entrega estimada: siguiente día por defecto
   const [estimatedDeliveryDate, setEstimatedDeliveryDate] = useState(
-    () => getLocalDateInputValue()
+    () => getTomorrowDateInputValue()
   )
   const [diagnosisCost, setDiagnosisCost] = useState("")
   const [internalNotes, setInternalNotes] = useState("")
@@ -124,7 +117,7 @@ export default function NuevoTicketPage() {
       const goNext = () => {
         e.preventDefault()
         if (index >= FIELD_CHAIN_LAST) {
-          scrollToAccessoriesAndEndKeyboard(e.currentTarget)
+          scrollToAccessoriesAndEndKeyboard(e.currentTarget as HTMLElement)
           return
         }
         focusKbField(index + 1)
@@ -216,7 +209,7 @@ export default function NuevoTicketPage() {
     setProblemDescription("")
     setAccessories([])
     setOtherAccessoryInput("")
-    setEstimatedDeliveryDate(getLocalDateInputValue())
+    setEstimatedDeliveryDate(getTomorrowDateInputValue())
     setDiagnosisCost("")
     setInternalNotes("")
     setPhotos([])
@@ -616,7 +609,7 @@ export default function NuevoTicketPage() {
                   step="0.01"
                 />
                 <p className="order-5 text-xs leading-snug text-muted-foreground sm:col-span-2">
-                  Por defecto la fecha de entrega es hoy; cámbiela si corresponde otro día.
+                  Por defecto la fecha de entrega es el siguiente día; cámbiela si corresponde otra fecha.
                 </p>
               </div>
 
@@ -701,7 +694,7 @@ export default function NuevoTicketPage() {
       </div>
 
       {savedTicket && (
-        <TicketFullPrintBundle ref={printBundleRef} ticket={savedTicket} />
+        <TicketFullPrintBundle ref={printBundleRef} ticket={savedTicket} customerLayout="full" />
       )}
     </DashboardLayout>
   )
