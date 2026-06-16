@@ -3,14 +3,9 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { DashboardLayout } from "@/components/dashboard-layout"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { PageHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
 import {
   Select,
   SelectContent,
@@ -21,24 +16,26 @@ import {
 import {
   ClipboardList,
   Loader2,
-  ChevronDown,
-  ChevronRight,
   Package,
   CheckCircle,
   Truck,
   PlusCircle,
-  BarChart3,
+  LayoutDashboard,
   Smartphone,
+  ArrowRight,
+  Wallet,
+  CalendarClock,
 } from "lucide-react"
 import {
   Ticket,
   TicketStatus,
-  STATUS_COLORS,
   STATUS_LABELS,
   EQUIPMENT_LABELS,
 } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { formatDateOnlyForDisplay } from "@/lib/date-utils"
+import { PhoneActions } from "@/components/phone-actions"
+import { buildTicketWhatsAppTemplates } from "@/lib/whatsapp"
 
 function parseTicket(t: Ticket): Ticket {
   return {
@@ -60,6 +57,15 @@ const statusFlow: TicketStatus[] = [
   "entregado",
 ]
 
+/** Color por estado (variable CSS, se adapta a claro/oscuro) */
+const STATUS_VAR: Record<TicketStatus, string> = {
+  recibido: "var(--chart-1)",
+  en_diagnostico: "var(--warning)",
+  en_reparacion: "var(--chart-2)",
+  listo: "var(--success)",
+  entregado: "var(--muted-foreground)",
+}
+
 interface Stats {
   receivedToday: number
   activeTickets: number
@@ -77,11 +83,8 @@ interface Stats {
 export default function DashboardPage() {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [ticketsLoading, setTicketsLoading] = useState(true)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
   const [statusSavingId, setStatusSavingId] = useState<string | null>(null)
-  const [statsOpen, setStatsOpen] = useState(false)
   const [stats, setStats] = useState<Stats | null>(null)
-  const [statsLoading, setStatsLoading] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -104,9 +107,7 @@ export default function DashboardPage() {
   }, [])
 
   useEffect(() => {
-    if (!statsOpen || stats !== null) return
     let cancelled = false
-    setStatsLoading(true)
     fetch("/api/stats")
       .then((res) => res.json())
       .then((data) => {
@@ -114,13 +115,10 @@ export default function DashboardPage() {
         setStats(data as Stats)
       })
       .catch(console.error)
-      .finally(() => {
-        if (!cancelled) setStatsLoading(false)
-      })
     return () => {
       cancelled = true
     }
-  }, [statsOpen, stats])
+  }, [])
 
   const handleStatusChange = async (ticketId: string, newStatus: TicketStatus) => {
     setStatusSavingId(ticketId)
@@ -139,9 +137,6 @@ export default function DashboardPage() {
         if (newStatus === "entregado") return prev.filter((t) => t.id !== ticketId)
         return prev.map((t) => (t.id === ticketId ? { ...t, status: newStatus } : t))
       })
-      if (newStatus === "entregado") {
-        setExpandedId((e) => (e === ticketId ? null : e))
-      }
     } catch (e) {
       console.error(e)
       alert("No se pudo cambiar el estado")
@@ -150,324 +145,280 @@ export default function DashboardPage() {
     }
   }
 
-  const todayCards = stats
-    ? [
-        {
-          title: "Recibidos hoy",
-          value: stats.receivedToday,
-          icon: Package,
-          bg: "bg-primary/10",
-          fg: "text-primary",
-        },
-        {
-          title: "Activos",
-          value: stats.activeTickets,
-          icon: ClipboardList,
-          bg: "bg-amber-100 dark:bg-amber-950",
-          fg: "text-amber-700 dark:text-amber-400",
-        },
-        {
-          title: "Listos",
-          value: stats.readyForPickup,
-          icon: CheckCircle,
-          bg: "bg-green-100 dark:bg-green-950",
-          fg: "text-green-700 dark:text-green-400",
-        },
-        {
-          title: "Entregados hoy",
-          value: stats.deliveredToday,
-          icon: Truck,
-          bg: "bg-muted",
-          fg: "text-muted-foreground",
-        },
-      ]
-    : []
+  const statCards = [
+    {
+      title: "Recibidos hoy",
+      value: stats?.receivedToday,
+      icon: Package,
+      tint: "var(--chart-1)",
+    },
+    {
+      title: "Activos",
+      value: stats?.activeTickets,
+      icon: ClipboardList,
+      tint: "var(--warning)",
+    },
+    {
+      title: "Listos para entrega",
+      value: stats?.readyForPickup,
+      icon: CheckCircle,
+      tint: "var(--success)",
+    },
+    {
+      title: "Entregados hoy",
+      value: stats?.deliveredToday,
+      icon: Truck,
+      tint: "var(--chart-2)",
+    },
+  ]
 
   const displayId = (t: Ticket) =>
     t.ticket_seq != null ? `N° ${t.ticket_seq}` : t.id
 
   const formatDate = (s: string) => formatDateOnlyForDisplay(s, "es-HN")
 
-  const toggleExpand = (id: string) => {
-    setExpandedId((prev) => (prev === id ? null : id))
-  }
-
   const accList = (t: Ticket) =>
     Array.isArray(t.accessories) ? t.accessories.filter(Boolean) : []
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Inicio</h1>
-            <p className="text-muted-foreground">
-              Tickets activos (más nuevos arriba). Toca una tarjeta para el detalle y el estado.
-            </p>
-          </div>
-          <Button asChild className="w-full shrink-0 sm:w-auto">
-            <Link href="/nuevo-ticket">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Nuevo ticket
-            </Link>
-          </Button>
+      <div className="space-y-8">
+        <PageHeader
+          icon={LayoutDashboard}
+          title="Inicio"
+          description="Resumen del taller y tickets activos."
+          action={
+            <Button asChild size="lg">
+              <Link href="/nuevo-ticket">
+                <PlusCircle className="mr-2 h-5 w-5" />
+                Nuevo ticket
+              </Link>
+            </Button>
+          }
+        />
+
+        {/* ── Estadísticas ───────────────────────────── */}
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 stagger">
+          {statCards.map((c) => (
+            <div
+              key={c.title}
+              className="hover-lift relative overflow-hidden rounded-2xl border border-border/70 bg-card p-4 sm:p-5"
+            >
+              <div
+                className="absolute -right-6 -top-6 h-20 w-20 rounded-full opacity-[0.12]"
+                style={{ background: c.tint }}
+                aria-hidden
+              />
+              <div className="flex items-center gap-3">
+                <span
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+                  style={{
+                    backgroundColor: `color-mix(in oklch, ${c.tint} 15%, transparent)`,
+                    color: c.tint,
+                  }}
+                >
+                  <c.icon className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  {c.value == null ? (
+                    <div className="h-7 w-10 rounded-md shimmer" />
+                  ) : (
+                    <p className="text-2xl font-bold leading-none tabular-nums">
+                      {c.value}
+                    </p>
+                  )}
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                    {c.title}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
 
-        <Card className="border-border shadow-sm">
-          <CardHeader className="pb-3">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <ClipboardList className="h-5 w-5" />
-                En taller
-                {!ticketsLoading && (
-                  <Badge variant="secondary" className="font-normal">
-                    {tickets.length} activo{tickets.length !== 1 ? "s" : ""}
-                  </Badge>
-                )}
-              </CardTitle>
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/tickets-activos">Lista completa y filtros</Link>
+        {/* Métricas secundarias */}
+        {stats && (
+          <div className="grid gap-3 sm:grid-cols-3 stagger">
+            <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card p-4">
+              <CalendarClock className="h-5 w-5 shrink-0 text-primary" />
+              <div className="text-sm">
+                <p className="font-semibold">Esta semana</p>
+                <p className="text-muted-foreground">
+                  {stats.weekTickets} tickets · L. {stats.weekRevenue.toFixed(2)}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card p-4">
+              <Truck className="h-5 w-5 shrink-0 text-chart-2" />
+              <div className="text-sm">
+                <p className="font-semibold">Este mes</p>
+                <p className="text-muted-foreground">
+                  {stats.monthDelivered} entregados · L. {stats.monthRevenue.toFixed(2)}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card p-4">
+              <Wallet className="h-5 w-5 shrink-0 text-amber-500" />
+              <div className="text-sm">
+                <p className="font-semibold">Por cobrar</p>
+                <p className="text-muted-foreground">
+                  L. {stats.pendingPayments.toFixed(2)} · {stats.avgRepairDays} días prom.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Tickets en taller ──────────────────────── */}
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="flex items-center gap-2 text-lg font-semibold">
+              <ClipboardList className="h-5 w-5 text-primary" />
+              En taller
+              {!ticketsLoading && (
+                <Badge variant="secondary" className="font-normal">
+                  {tickets.length} activo{tickets.length !== 1 ? "s" : ""}
+                </Badge>
+              )}
+            </h2>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/tickets-activos">
+                Lista completa y filtros
+                <ArrowRight className="ml-1.5 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+
+          {ticketsLoading ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-52 rounded-2xl border border-border/70 bg-card p-5"
+                >
+                  <div className="h-5 w-24 rounded shimmer" />
+                  <div className="mt-4 h-6 w-40 rounded shimmer" />
+                  <div className="mt-3 h-4 w-full rounded shimmer" />
+                  <div className="mt-2 h-4 w-3/4 rounded shimmer" />
+                </div>
+              ))}
+            </div>
+          ) : tickets.length === 0 ? (
+            <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-card/50 py-16 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-brand-soft">
+                <ClipboardList className="h-8 w-8 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium">No hay tickets activos</p>
+                <p className="text-sm text-muted-foreground">
+                  Crea el primero para empezar.
+                </p>
+              </div>
+              <Button asChild>
+                <Link href="/nuevo-ticket">
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Crear ticket
+                </Link>
               </Button>
             </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {ticketsLoading ? (
-              <div className="flex items-center justify-center py-16">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : tickets.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground">
-                <p className="mb-3">No hay tickets activos.</p>
-                <Button asChild>
-                  <Link href="/nuevo-ticket">Crear el primero</Link>
-                </Button>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-4 max-w-2xl mx-auto">
-                {tickets.map((ticket) => {
-                  const open = expandedId === ticket.id
-                  return (
-                    <div
-                      key={ticket.id}
-                      className={cn(
-                        "rounded-2xl border bg-card text-left shadow-md transition-all duration-200",
-                        open
-                          ? "border-primary/40 shadow-lg ring-2 ring-primary/20"
-                          : "hover:border-primary/30 hover:shadow-lg"
-                      )}
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 stagger">
+              {tickets.map((ticket) => {
+                const color = STATUS_VAR[ticket.status]
+                const waTemplates = buildTicketWhatsAppTemplates(ticket)
+                return (
+                  <article
+                    key={ticket.id}
+                    className="hover-lift group relative flex flex-col overflow-hidden rounded-2xl border border-border/70 bg-card"
+                  >
+                    {/* Barra de acento por estado */}
+                    <span
+                      className="absolute inset-y-0 left-0 w-1.5"
+                      style={{ background: color }}
+                      aria-hidden
+                    />
+
+                    <Link
+                      href={`/tickets-activos?ticketId=${encodeURIComponent(ticket.id)}`}
+                      className="block flex-1 space-y-3 p-5 pl-6 outline-none focus-visible:bg-muted/40"
                     >
-                      <button
-                        type="button"
-                        onClick={() => toggleExpand(ticket.id)}
-                        className="flex w-full gap-3 p-4 sm:p-5 text-left rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      >
-                        <div
-                          className={cn(
-                            "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border bg-muted/50 transition-transform",
-                            open && "rotate-90"
-                          )}
-                        >
-                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        <div className="min-w-0 flex-1 space-y-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-mono text-sm font-bold text-primary">
-                              {displayId(ticket)}
-                            </span>
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] border-0 px-2 py-0"
-                              style={{
-                                backgroundColor: `${STATUS_COLORS[ticket.status]}18`,
-                                color: STATUS_COLORS[ticket.status],
-                              }}
-                            >
-                              {STATUS_LABELS[ticket.status]}
-                            </Badge>
-                            <Badge variant="secondary" className="text-xs font-medium">
-                              {EQUIPMENT_LABELS[ticket.equipment_type] ?? ticket.equipment_type}
-                            </Badge>
-                          </div>
-                          <div>
-                            <p className="font-semibold text-base leading-tight">
-                              {ticket.client_name}
-                            </p>
-                            <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                              <Smartphone className="h-3.5 w-3.5 shrink-0" />
-                              {ticket.client_phone}
-                            </p>
-                          </div>
-                          <p className="text-sm text-foreground/90 line-clamp-3 leading-snug border-l-2 border-border pl-3">
-                            {ticket.problem_description || "Sin descripción del problema."}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {open ? "Ocultar detalle" : "Tocar para estado y más datos"}
-                          </p>
-                        </div>
-                      </button>
-
-                      {open && (
-                        <div className="border-t border-border/80 px-4 pb-4 pt-3 sm:px-5 sm:pb-5 space-y-4">
-                          <div className="grid gap-2 text-sm sm:grid-cols-2">
-                            <p>
-                              <span className="text-muted-foreground">Marca / modelo</span>
-                              <br />
-                              <span className="font-medium">
-                                {[ticket.brand, ticket.model].filter(Boolean).join(" · ") || "—"}
-                              </span>
-                            </p>
-                            <p>
-                              <span className="text-muted-foreground">Ingreso</span>
-                              <br />
-                              <span className="font-medium">
-                                {ticket.created_at ? formatDate(ticket.created_at) : "—"}
-                              </span>
-                            </p>
-                            {ticket.estimated_delivery_date && (
-                              <p>
-                                <span className="text-muted-foreground">Entrega est.</span>
-                                <br />
-                                <span className="font-medium">
-                                  {formatDate(ticket.estimated_delivery_date)}
-                                </span>
-                              </p>
-                            )}
-                            {ticket.serial_number && (
-                              <p>
-                                <span className="text-muted-foreground">Serie</span>
-                                <br />
-                                <span className="font-mono font-medium">{ticket.serial_number}</span>
-                              </p>
-                            )}
-                          </div>
-
-                          {accList(ticket).length > 0 && (
-                            <p className="text-sm">
-                              <span className="text-muted-foreground">Accesorios: </span>
-                              {accList(ticket).join(", ")}
-                            </p>
-                          )}
-
-                          {ticket.internal_notes && (
-                            <p className="text-xs text-muted-foreground rounded-md bg-muted/50 p-2">
-                              <span className="font-medium text-foreground/80">Notas internas: </span>
-                              {ticket.internal_notes}
-                            </p>
-                          )}
-
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium">Estado del ticket</label>
-                            <Select
-                              value={ticket.status}
-                              disabled={statusSavingId === ticket.id}
-                              onValueChange={(v) =>
-                                void handleStatusChange(ticket.id, v as TicketStatus)
-                              }
-                            >
-                              <SelectTrigger className="h-11 w-full max-w-md">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {statusFlow.map((st) => (
-                                  <SelectItem key={st} value={st}>
-                                    {STATUS_LABELS[st]}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            {statusSavingId === ticket.id && (
-                              <p className="text-xs text-muted-foreground flex items-center gap-2">
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                Guardando…
-                              </p>
-                            )}
-                            <p className="text-xs text-muted-foreground">
-                              Si marca <strong className="text-foreground">Entregado</strong>, el
-                              ticket sale de esta lista (sigue en historial).
-                            </p>
-                          </div>
-
-                          <Button variant="outline" className="w-full sm:w-auto" asChild>
-                            <Link
-                              href={`/tickets-activos?ticketId=${encodeURIComponent(ticket.id)}`}
-                            >
-                              Abrir ficha completa (costos, fotos, imprimir…)
-                            </Link>
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Collapsible open={statsOpen} onOpenChange={setStatsOpen}>
-          <Card className="border-border border-dashed">
-            <CollapsibleTrigger asChild>
-              <button
-                type="button"
-                className="flex w-full items-center justify-between gap-2 p-4 text-left hover:bg-muted/50 rounded-xl transition-colors"
-              >
-                <span className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <BarChart3 className="h-4 w-4" />
-                  Estadísticas del taller (opcional)
-                </span>
-                <ChevronDown
-                  className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${statsOpen ? "rotate-180" : ""}`}
-                />
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent className="pt-0 pb-4 space-y-4">
-                {statsLoading && (
-                  <div className="flex justify-center py-6">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  </div>
-                )}
-                {!statsLoading && stats && (
-                  <>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                      {todayCards.map((c) => (
-                        <div
-                          key={c.title}
-                          className="flex items-center gap-3 rounded-lg border border-border p-3"
-                        >
-                          <div className={`rounded-lg p-2 ${c.bg}`}>
-                            <c.icon className={`h-4 w-4 ${c.fg}`} />
-                          </div>
-                          <div>
-                            <p className="text-xl font-bold">{c.value}</p>
-                            <p className="text-xs text-muted-foreground">{c.title}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-3 text-sm text-muted-foreground">
-                      <p>
-                        <span className="font-medium text-foreground">Semana:</span>{" "}
-                        {stats.weekTickets} tickets · L. {stats.weekRevenue.toFixed(2)}
-                      </p>
-                      <p>
-                        <span className="font-medium text-foreground">Mes:</span>{" "}
-                        {stats.monthDelivered} entregados · L. {stats.monthRevenue.toFixed(2)}
-                      </p>
-                      <p>
-                        <span className="font-medium text-foreground">Promedio reparación:</span>{" "}
-                        {stats.avgRepairDays} días ·{" "}
-                        <span className="text-amber-700 dark:text-amber-400">
-                          Por cobrar L. {stats.pendingPayments.toFixed(2)}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-sm font-bold text-primary">
+                          {displayId(ticket)}
                         </span>
+                        <span
+                          className="rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+                          style={{
+                            backgroundColor: `color-mix(in oklch, ${color} 16%, transparent)`,
+                            color,
+                          }}
+                        >
+                          {STATUS_LABELS[ticket.status]}
+                        </span>
+                        <Badge variant="secondary" className="text-[11px] font-medium">
+                          {EQUIPMENT_LABELS[ticket.equipment_type] ?? ticket.equipment_type}
+                        </Badge>
+                      </div>
+
+                      <p className="font-semibold leading-tight">
+                        {ticket.client_name}
                       </p>
+
+                      <p className="line-clamp-2 text-sm leading-snug text-foreground/80">
+                        {ticket.problem_description || "Sin descripción del problema."}
+                      </p>
+
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                        <span>Ingreso: {ticket.created_at ? formatDate(ticket.created_at) : "—"}</span>
+                        {accList(ticket).length > 0 && (
+                          <span>· {accList(ticket).length} accesorio{accList(ticket).length !== 1 ? "s" : ""}</span>
+                        )}
+                      </div>
+                    </Link>
+
+                    {/* Pie: contacto + cambio rápido de estado */}
+                    <div className="space-y-2.5 border-t border-border/70 bg-muted/30 px-5 py-3 pl-6">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-1.5 text-sm font-medium">
+                          <Smartphone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          {ticket.client_phone}
+                        </span>
+                        <PhoneActions
+                          phone={ticket.client_phone}
+                          templates={waTemplates}
+                          size="sm"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={ticket.status}
+                          disabled={statusSavingId === ticket.id}
+                          onValueChange={(v) =>
+                            void handleStatusChange(ticket.id, v as TicketStatus)
+                          }
+                        >
+                          <SelectTrigger className="h-9 flex-1 bg-card text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {statusFlow.map((st) => (
+                              <SelectItem key={st} value={st}>
+                                {STATUS_LABELS[st]}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {statusSavingId === ticket.id && (
+                          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+                        )}
+                      </div>
                     </div>
-                  </>
-                )}
-              </CardContent>
-            </CollapsibleContent>
-          </Card>
-        </Collapsible>
+                  </article>
+                )
+              })}
+            </div>
+          )}
+        </section>
       </div>
     </DashboardLayout>
   )

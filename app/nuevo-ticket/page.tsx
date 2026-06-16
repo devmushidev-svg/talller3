@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { DashboardLayout } from "@/components/dashboard-layout"
+import { PageHeader } from "@/components/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,14 +24,26 @@ import {
   accessoryMatchesCheckbox,
   isStandardAccessoryStored,
 } from "@/lib/types"
-import { Save, Printer, Loader2, Calendar, DollarSign, FileText, Plus, X } from "lucide-react"
+import {
+  Save,
+  Printer,
+  Loader2,
+  Calendar,
+  DollarSign,
+  FileText,
+  Plus,
+  X,
+  PlusCircle,
+  User,
+  Cpu,
+  Package,
+  Keyboard,
+  CheckCircle2,
+} from "lucide-react"
 import { PhotoUpload } from "@/components/photo-upload"
 import { getLocalDateInputValue, getTomorrowDateInputValue } from "@/lib/date-utils"
 import { CustomerHistory } from "@/components/customer-history"
-import {
-  TicketFullPrintBundle,
-  type TicketFullPrintBundleHandle,
-} from "@/components/ticket-full-print-bundle"
+import { CustomerTicket, type CustomerTicketHandle } from "@/components/customer-ticket"
 
 export default function NuevoTicketPage() {
   const [clientName, setClientName] = useState("")
@@ -43,7 +56,7 @@ export default function NuevoTicketPage() {
   const [problemDescription, setProblemDescription] = useState("")
   const [accessories, setAccessories] = useState<string[]>([])
   const [otherAccessoryInput, setOtherAccessoryInput] = useState("")
-  
+
   // New fields — entrega estimada: siguiente día por defecto
   const [estimatedDeliveryDate, setEstimatedDeliveryDate] = useState(
     () => getTomorrowDateInputValue()
@@ -52,9 +65,16 @@ export default function NuevoTicketPage() {
   const [internalNotes, setInternalNotes] = useState("")
   const [photos, setPhotos] = useState<string[]>([])
   const [tempTicketId] = useState(() => `TKT-${Date.now()}`)
-  
+
   const [savedTicket, setSavedTicket] = useState<Ticket | null>(null)
-  const printBundleRef = useRef<TicketFullPrintBundleHandle>(null)
+  const [printSettings, setPrintSettings] = useState(() => ({
+    id: "default",
+    shop_name: "MULTIPLANET",
+    shop_phone: "",
+    shop_address: "",
+    printer_width: "80mm",
+  }))
+  const customerTicketRef = useRef<CustomerTicketHandle>(null)
   const [saving, setSaving] = useState(false)
   const [customerExists, setCustomerExists] = useState(false)
   const [equipmentSelectOpen, setEquipmentSelectOpen] = useState(false)
@@ -172,7 +192,7 @@ export default function NuevoTicketPage() {
         setCustomerExists(false)
       }
     }
-    
+
     const debounce = setTimeout(checkCustomer, 500)
     return () => clearTimeout(debounce)
   }, [clientPhone, clientName])
@@ -266,11 +286,11 @@ export default function NuevoTicketPage() {
       if (!response.ok) throw new Error("Error al guardar")
 
       const ticket = await response.json()
-      
+
       const parsedTicket: Ticket = {
         ...ticket,
-        accessories: typeof ticket.accessories === "string" 
-          ? JSON.parse(ticket.accessories) 
+        accessories: typeof ticket.accessories === "string"
+          ? JSON.parse(ticket.accessories)
           : ticket.accessories || [],
         photos: typeof ticket.photos === "string"
           ? JSON.parse(ticket.photos)
@@ -280,8 +300,13 @@ export default function NuevoTicketPage() {
       setSavedTicket(parsedTicket)
 
       if (openPrintDialog) {
+        // Carga settings antes de imprimir
+        fetch("/api/settings")
+          .then((r) => r.json())
+          .then((data) => { if (data && !data.error) setPrintSettings(data) })
+          .catch(() => {})
         window.setTimeout(() => {
-          void printBundleRef.current?.printAll()
+          customerTicketRef.current?.print()
         }, 900)
       } else {
         alert(`Ticket ${ticket.id} creado correctamente`)
@@ -301,31 +326,45 @@ export default function NuevoTicketPage() {
 
   return (
     <DashboardLayout>
-      <div className="mx-auto max-w-4xl space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Nuevo Ticket</h1>
-          <p className="text-muted-foreground">Registro rápido de equipos</p>
-          {!savedTicket && (
-            <p className="mt-2 text-sm text-muted-foreground">
-              <kbd className="rounded border bg-muted px-1.5 py-0.5 text-xs">↑</kbd>{" "}
-              <kbd className="rounded border bg-muted px-1.5 py-0.5 text-xs">↓</kbd>{" "}
-              <kbd className="rounded border bg-muted px-1.5 py-0.5 text-xs">←</kbd>{" "}
-              <kbd className="rounded border bg-muted px-1.5 py-0.5 text-xs">→</kbd>{" "}
-              <kbd className="rounded border bg-muted px-1.5 py-0.5 text-xs">Enter</kbd>{" "}
+      <div className="mx-auto max-w-4xl space-y-8">
+        <PageHeader
+          icon={PlusCircle}
+          title="Nuevo Ticket"
+          description="Registro rápido de equipos en el taller."
+        />
+
+        {/* Ayuda de navegación por teclado */}
+        {!savedTicket && (
+          <div className="flex items-start gap-3 rounded-2xl border border-border/70 bg-gradient-brand-soft p-4 text-sm">
+            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-card text-primary shadow-sm">
+              <Keyboard className="h-5 w-5" />
+            </span>
+            <p className="leading-relaxed text-muted-foreground">
+              <kbd className="rounded border bg-card px-1.5 py-0.5 text-xs font-medium text-foreground">↑</kbd>{" "}
+              <kbd className="rounded border bg-card px-1.5 py-0.5 text-xs font-medium text-foreground">↓</kbd>{" "}
+              <kbd className="rounded border bg-card px-1.5 py-0.5 text-xs font-medium text-foreground">←</kbd>{" "}
+              <kbd className="rounded border bg-card px-1.5 py-0.5 text-xs font-medium text-foreground">→</kbd>{" "}
+              <kbd className="rounded border bg-card px-1.5 py-0.5 text-xs font-medium text-foreground">Enter</kbd>{" "}
               para moverse entre campos hasta <strong className="text-foreground">Problema</strong>.
               En <strong className="text-foreground">Accesorios</strong> use el ratón (y el botón
-              imprimir). En el cuadro de texto: <kbd className="rounded border bg-muted px-1.5 py-0.5 text-xs">Shift</kbd>{" "}
-              + <kbd className="rounded border bg-muted px-1.5 py-0.5 text-xs">Enter</kbd> para
-              nueva línea.
+              imprimir). En el cuadro de texto:{" "}
+              <kbd className="rounded border bg-card px-1.5 py-0.5 text-xs font-medium text-foreground">Shift</kbd>{" "}
+              + <kbd className="rounded border bg-card px-1.5 py-0.5 text-xs font-medium text-foreground">Enter</kbd>{" "}
+              para nueva línea.
             </p>
-          )}
-        </div>
+          </div>
+        )}
 
-        <div className="grid gap-6">
+        <div className="space-y-6">
           {/* Client Info */}
-          <Card className="border-border">
+          <Card>
             <CardHeader className="pb-4">
-              <CardTitle className="text-lg">Datos del Cliente</CardTitle>
+              <CardTitle className="flex items-center gap-2.5 text-lg">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-brand-soft text-primary">
+                  <User className="h-5 w-5" />
+                </span>
+                Datos del Cliente
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -371,11 +410,14 @@ export default function NuevoTicketPage() {
                   />
                 </div>
               </div>
-              
+
               {/* Customer history button */}
               {customerExists && clientPhone && (
-                <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                  <span className="text-sm text-muted-foreground">Cliente existente</span>
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-muted/40 px-4 py-3">
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                    <CheckCircle2 className="h-4 w-4 text-[var(--success)]" />
+                    Cliente existente
+                  </span>
                   <CustomerHistory phone={clientPhone} name={clientName} />
                 </div>
               )}
@@ -383,9 +425,14 @@ export default function NuevoTicketPage() {
           </Card>
 
           {/* Equipment Info */}
-          <Card className="border-border">
+          <Card>
             <CardHeader className="pb-4">
-              <CardTitle className="text-lg">Datos del Equipo</CardTitle>
+              <CardTitle className="flex items-center gap-2.5 text-lg">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-brand-soft text-primary">
+                  <Cpu className="h-5 w-5" />
+                </span>
+                Datos del Equipo
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -483,36 +530,50 @@ export default function NuevoTicketPage() {
           </Card>
 
           {/* Accessories — desde aquí el flujo es con ratón; fechas, notas e imprimir */}
-          <Card className="border-border">
+          <Card>
             <CardHeader className="pb-4">
-              <CardTitle className="text-lg">Accesorios Recibidos</CardTitle>
+              <CardTitle className="flex items-center gap-2.5 text-lg">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-brand-soft text-primary">
+                  <Package className="h-5 w-5" />
+                </span>
+                Accesorios Recibidos
+              </CardTitle>
               {!savedTicket && (
-                <p className="text-sm font-normal text-muted-foreground">
+                <p className="pl-[2.875rem] text-sm font-normal text-muted-foreground">
                   Use el ratón para marcar accesorios y completar el resto del formulario; termine con{" "}
                   <strong className="text-foreground">Guardar e imprimir</strong>.
                 </p>
               )}
             </CardHeader>
             <CardContent ref={accessoriesMouseSectionRef} id="accesorios-raton">
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-3">
-                {ACCESSORY_CHECKBOX_LABELS.map((accessory) => (
-                  <div key={accessory} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={accessory}
-                      checked={accessories.some((a) =>
-                        accessoryMatchesCheckbox(a, accessory)
-                      )}
-                      onCheckedChange={(checked) =>
-                        handleAccessoryChange(accessory, checked as boolean)
-                      }
-                    />
-                    <Label htmlFor={accessory} className="cursor-pointer text-sm">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {ACCESSORY_CHECKBOX_LABELS.map((accessory) => {
+                  const checked = accessories.some((a) =>
+                    accessoryMatchesCheckbox(a, accessory)
+                  )
+                  return (
+                    <Label
+                      key={accessory}
+                      htmlFor={accessory}
+                      className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm transition-colors ${
+                        checked
+                          ? "border-primary/40 bg-primary/5 text-foreground"
+                          : "border-border/70 bg-card text-muted-foreground hover:bg-muted/40"
+                      }`}
+                    >
+                      <Checkbox
+                        id={accessory}
+                        checked={checked}
+                        onCheckedChange={(c) =>
+                          handleAccessoryChange(accessory, c as boolean)
+                        }
+                      />
                       {accessory}
                     </Label>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
-              <div className="mt-6 space-y-3 border-t border-border pt-4">
+              <div className="mt-6 space-y-3 border-t border-border/70 pt-5">
                 <Label>Otro accesorio o detalle</Label>
                 <p className="text-xs text-muted-foreground">
                   Puede añadir varios accesorios o detalles.
@@ -522,7 +583,7 @@ export default function NuevoTicketPage() {
                     value={otherAccessoryInput}
                     onChange={(e) => setOtherAccessoryInput(e.target.value)}
                     placeholder="Ej. Disco externo, control…"
-                    className="sm:flex-1"
+                    className="h-11 sm:flex-1"
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault()
@@ -533,7 +594,7 @@ export default function NuevoTicketPage() {
                   <Button
                     type="button"
                     variant="secondary"
-                    className="shrink-0"
+                    className="h-11 shrink-0"
                     onClick={handleAddOtherAccessory}
                   >
                     <Plus className="mr-2 h-4 w-4" />
@@ -548,7 +609,7 @@ export default function NuevoTicketPage() {
                       .map((item) => (
                         <li
                           key={item}
-                          className="flex items-start justify-between gap-2 rounded-md bg-muted px-3 py-2"
+                          className="flex items-start justify-between gap-2 rounded-xl border border-border/70 bg-muted/40 px-3 py-2"
                         >
                           <span>{item}</span>
                           <Button
@@ -570,9 +631,14 @@ export default function NuevoTicketPage() {
           </Card>
 
           {/* Additional Info */}
-          <Card className="border-border">
+          <Card>
             <CardHeader className="pb-4">
-              <CardTitle className="text-lg">Información Adicional</CardTitle>
+              <CardTitle className="flex items-center gap-2.5 text-lg">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-brand-soft text-primary">
+                  <FileText className="h-5 w-5" />
+                </span>
+                Información Adicional
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-x-6 sm:gap-y-2">
@@ -662,28 +728,31 @@ export default function NuevoTicketPage() {
               </Button>
             </div>
           ) : (
-            <Card className="border-green-500 bg-green-50 dark:bg-green-950">
+            <Card className="animate-scale-in border-[var(--success)]/40 bg-[color-mix(in_oklch,var(--success)_8%,transparent)]">
               <CardContent className="pt-6">
                 <div className="space-y-6">
-                  <div className="flex flex-col items-center gap-2 text-center text-green-700 dark:text-green-400">
-                    <div className="flex items-center gap-2">
-                      <Save className="h-6 w-6" />
-                      <span className="text-lg font-semibold">
+                  <div className="flex flex-col items-center gap-3 text-center">
+                    <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[color-mix(in_oklch,var(--success)_16%,transparent)] text-[var(--success)]">
+                      <CheckCircle2 className="h-7 w-7" />
+                    </span>
+                    <div className="space-y-1">
+                      <p className="text-lg font-semibold text-foreground">
                         Ticket N°{" "}
                         {savedTicket.ticket_seq != null ? savedTicket.ticket_seq : savedTicket.id}{" "}
                         guardado
-                      </span>
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        El ticket quedó registrado correctamente.
+                      </p>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      El ticket quedó registrado correctamente.
-                    </p>
                   </div>
                   <Button
                     onClick={handleNewTicket}
                     size="lg"
                     variant="outline"
-                    className="w-full h-12 text-base"
+                    className="h-12 w-full text-base"
                   >
+                    <PlusCircle className="mr-2 h-5 w-5" />
                     Crear Nuevo Ticket
                   </Button>
                 </div>
@@ -694,7 +763,14 @@ export default function NuevoTicketPage() {
       </div>
 
       {savedTicket && (
-        <TicketFullPrintBundle ref={printBundleRef} ticket={savedTicket} customerLayout="full" />
+        <div className="pointer-events-none fixed left-[-10000px] top-0 w-[480px] opacity-0" aria-hidden>
+          <CustomerTicket
+            ref={customerTicketRef}
+            ticket={savedTicket}
+            settings={printSettings}
+            hideTrigger
+          />
+        </div>
       )}
     </DashboardLayout>
   )

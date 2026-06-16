@@ -9,3 +9,9 @@ node_modules/
 .env*.local
 .DS_Store
 .vercel
+
+# Claude Code local config
+.claude/
+
+# Build artifacts
+tsconfig.tsbuildinfo
