@@ -27,10 +27,7 @@ import { Save, Printer, Loader2, Calendar, DollarSign, FileText, Plus, X } from 
 import { PhotoUpload } from "@/components/photo-upload"
 import { getLocalDateInputValue, getTomorrowDateInputValue } from "@/lib/date-utils"
 import { CustomerHistory } from "@/components/customer-history"
-import {
-  TicketFullPrintBundle,
-  type TicketFullPrintBundleHandle,
-} from "@/components/ticket-full-print-bundle"
+import { CustomerTicket, type CustomerTicketHandle } from "@/components/customer-ticket"
 
 export default function NuevoTicketPage() {
   const [clientName, setClientName] = useState("")
@@ -54,7 +51,14 @@ export default function NuevoTicketPage() {
   const [tempTicketId] = useState(() => `TKT-${Date.now()}`)
   
   const [savedTicket, setSavedTicket] = useState<Ticket | null>(null)
-  const printBundleRef = useRef<TicketFullPrintBundleHandle>(null)
+  const [printSettings, setPrintSettings] = useState(() => ({
+    id: "default",
+    shop_name: "MULTIPLANET",
+    shop_phone: "",
+    shop_address: "",
+    printer_width: "80mm",
+  }))
+  const customerTicketRef = useRef<CustomerTicketHandle>(null)
   const [saving, setSaving] = useState(false)
   const [customerExists, setCustomerExists] = useState(false)
   const [equipmentSelectOpen, setEquipmentSelectOpen] = useState(false)
@@ -280,8 +284,13 @@ export default function NuevoTicketPage() {
       setSavedTicket(parsedTicket)
 
       if (openPrintDialog) {
+        // Carga settings antes de imprimir
+        fetch("/api/settings")
+          .then((r) => r.json())
+          .then((data) => { if (data && !data.error) setPrintSettings(data) })
+          .catch(() => {})
         window.setTimeout(() => {
-          void printBundleRef.current?.printAll()
+          customerTicketRef.current?.print()
         }, 900)
       } else {
         alert(`Ticket ${ticket.id} creado correctamente`)
@@ -694,7 +703,14 @@ export default function NuevoTicketPage() {
       </div>
 
       {savedTicket && (
-        <TicketFullPrintBundle ref={printBundleRef} ticket={savedTicket} customerLayout="full" />
+        <div className="pointer-events-none fixed left-[-10000px] top-0 w-[480px] opacity-0" aria-hidden>
+          <CustomerTicket
+            ref={customerTicketRef}
+            ticket={savedTicket}
+            settings={printSettings}
+            hideTrigger
+          />
+        </div>
       )}
     </DashboardLayout>
   )

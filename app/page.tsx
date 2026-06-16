@@ -200,12 +200,14 @@ export default function DashboardPage() {
       <div className="space-y-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Inicio</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-3xl font-bold tracking-tight">
+              <span className="text-gradient">Inicio</span>
+            </h1>
+            <p className="text-muted-foreground mt-1">
               Tickets activos (más nuevos arriba). Toca una tarjeta para el detalle y el estado.
             </p>
           </div>
-          <Button asChild className="w-full shrink-0 sm:w-auto">
+          <Button asChild size="lg" className="w-full shrink-0 sm:w-auto">
             <Link href="/nuevo-ticket">
               <PlusCircle className="mr-2 h-4 w-4" />
               Nuevo ticket
@@ -243,17 +245,17 @@ export default function DashboardPage() {
                 </Button>
               </div>
             ) : (
-              <div className="flex flex-col gap-4 max-w-2xl mx-auto">
+              <div className="flex flex-col gap-4 max-w-2xl mx-auto stagger">
                 {tickets.map((ticket) => {
                   const open = expandedId === ticket.id
                   return (
                     <div
                       key={ticket.id}
                       className={cn(
-                        "rounded-2xl border bg-card text-left shadow-md transition-all duration-200",
+                        "rounded-2xl border bg-card text-left shadow-sm transition-all duration-300",
                         open
-                          ? "border-primary/40 shadow-lg ring-2 ring-primary/20"
-                          : "hover:border-primary/30 hover:shadow-lg"
+                          ? "border-primary/40 shadow-lg shadow-primary/10 ring-2 ring-primary/20"
+                          : "hover-lift hover:border-primary/30"
                       )}
                     >
                       <button
@@ -429,11 +431,11 @@ export default function DashboardPage() {
                 )}
                 {!statsLoading && stats && (
                   <>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 stagger">
                       {todayCards.map((c) => (
                         <div
                           key={c.title}
-                          className="flex items-center gap-3 rounded-lg border border-border p-3"
+                          className="flex items-center gap-3 rounded-xl border border-border/70 p-3 hover-lift bg-card"
                         >
                           <div className={`rounded-lg p-2 ${c.bg}`}>
                             <c.icon className={`h-4 w-4 ${c.fg}`} />
