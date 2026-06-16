@@ -12,3 +12,6 @@ node_modules/
 
 # Claude Code local config
 .claude/
+
+# Build artifacts
+tsconfig.tsbuildinfo

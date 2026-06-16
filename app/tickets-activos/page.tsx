@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/dashboard-layout"
+import { PageHeader } from "@/components/page-header"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -34,27 +35,29 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import {
   Ticket,
   TicketStatus,
-  STATUS_COLORS,
   STATUS_LABELS,
   EQUIPMENT_LABELS,
-  EquipmentType,
 } from "@/lib/types"
-import { 
-  Search, 
-  Eye, 
-  Printer, 
-  Loader2, 
-  Filter, 
-  ChevronDown,
+import {
+  Search,
+  Eye,
+  Printer,
+  Loader2,
+  Filter,
   Calendar,
-  DollarSign,
   Tag,
-  Image as ImageIcon
+  Image as ImageIcon,
+  ClipboardList,
+  Smartphone,
+  X,
+  Pencil,
 } from "lucide-react"
 import { QRScanner } from "@/components/qr-scanner"
 import { CustomerHistory } from "@/components/customer-history"
 import { PrintCustomer } from "@/components/print-customer"
 import { PrintInternal } from "@/components/print-internal"
+import { PhoneActions } from "@/components/phone-actions"
+import { buildTicketWhatsAppTemplates } from "@/lib/whatsapp"
 import { formatDateOnlyForDisplay } from "@/lib/date-utils"
 
 const statusOptions: TicketStatus[] = [
@@ -64,6 +67,31 @@ const statusOptions: TicketStatus[] = [
   "listo",
   "entregado",
 ]
+
+/** Color por estado (variable CSS, se adapta a claro/oscuro) */
+const STATUS_VAR: Record<TicketStatus, string> = {
+  recibido: "var(--chart-1)",
+  en_diagnostico: "var(--warning)",
+  en_reparacion: "var(--chart-2)",
+  listo: "var(--success)",
+  entregado: "var(--muted-foreground)",
+}
+
+/** Píldora de estado con tinte por color */
+function StatusPill({ status }: { status: TicketStatus }) {
+  const color = STATUS_VAR[status]
+  return (
+    <span
+      className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+      style={{
+        backgroundColor: `color-mix(in oklch, ${color} 16%, transparent)`,
+        color,
+      }}
+    >
+      {STATUS_LABELS[status]}
+    </span>
+  )
+}
 
 export default function TicketsActivosPage() {
   const router = useRouter()
@@ -75,13 +103,13 @@ export default function TicketsActivosPage() {
   const [showInternalPrint, setShowInternalPrint] = useState(false)
   const [loading, setLoading] = useState(true)
   const [showFilters, setShowFilters] = useState(false)
-  
+
   // Advanced filters
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [equipmentFilter, setEquipmentFilter] = useState<string>("all")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
-  
+
   // Edit mode
   const [editMode, setEditMode] = useState(false)
   const [editDiagnosis, setEditDiagnosis] = useState("")
@@ -113,11 +141,11 @@ export default function TicketsActivosPage() {
       if (equipmentFilter !== 'all') params.set('equipment_type', equipmentFilter)
       if (dateFrom) params.set('date_from', dateFrom)
       if (dateTo) params.set('date_to', dateTo)
-      
+
       const url = params.toString() ? `/api/search?${params}` : '/api/tickets'
       const response = await fetch(url)
       const data = await response.json()
-      
+
       const parsedTickets = (Array.isArray(data) ? data : [])
         .map((t: Ticket) => parseTicket(t))
         .filter((t: Ticket) => statusFilter === 'all' ? t.status !== "entregado" : true)
@@ -144,7 +172,7 @@ export default function TicketsActivosPage() {
       if (newStatus === 'entregado') {
         updateData.delivered_at = new Date().toISOString()
       }
-      
+
       await fetch(`/api/tickets/${ticketId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -202,12 +230,12 @@ export default function TicketsActivosPage() {
 
   const handleSaveDetails = async () => {
     if (!selectedTicket) return
-    
+
     const laborCost = parseFloat(editLaborCost) || 0
     const partsCost = parseFloat(editPartsCost) || 0
     const totalCost = laborCost + partsCost
     const amountPaid = parseFloat(editAmountPaid) || 0
-    
+
     try {
       await fetch(`/api/tickets/${selectedTicket.id}`, {
         method: "PATCH",
@@ -222,7 +250,7 @@ export default function TicketsActivosPage() {
           payment_status: amountPaid >= totalCost ? 'pagado' : 'pendiente',
         }),
       })
-      
+
       const updatedTicket = {
         ...selectedTicket,
         diagnosis: editDiagnosis,
@@ -233,7 +261,7 @@ export default function TicketsActivosPage() {
         amount_paid: amountPaid,
         payment_status: amountPaid >= totalCost ? 'pagado' : 'pendiente',
       }
-      
+
       setSelectedTicket(updatedTicket)
       setTickets(prev => prev.map(t => t.id === selectedTicket.id ? updatedTicket : t))
       setEditMode(false)
@@ -301,47 +329,51 @@ export default function TicketsActivosPage() {
 
   const hasActiveFilters = statusFilter !== 'all' || equipmentFilter !== 'all' || dateFrom || dateTo
 
+  const displayId = (t: Ticket) =>
+    t.ticket_seq != null ? `N° ${t.ticket_seq}` : t.id
+
   return (
     <DashboardLayout>
-      <div className="space-y-4">
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Tickets Activos</h1>
-            <p className="text-muted-foreground">
-              {tickets.length} equipos encontrados
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <QRScanner onScan={handleQRScan} />
-          </div>
-        </div>
+      <div className="space-y-8">
+        <PageHeader
+          icon={ClipboardList}
+          title="Tickets Activos"
+          description="Busca, filtra y gestiona los equipos en taller."
+          action={<QRScanner onScan={handleQRScan} />}
+        />
 
-        {/* Search & Filters */}
-        <Card className="border-border">
-          <CardContent className="p-4 space-y-4">
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Cliente, N° ticket (ej. 4), ID, teléfono, marca..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <Collapsible open={showFilters} onOpenChange={setShowFilters}>
+        {/* ── Búsqueda y filtros ─────────────────────── */}
+        <Collapsible open={showFilters} onOpenChange={setShowFilters}>
+          <Card>
+            <CardContent className="space-y-4 p-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Cliente, N° ticket (ej. 4), ID, teléfono, marca..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="h-11 pl-10"
+                  />
+                </div>
                 <CollapsibleTrigger asChild>
-                  <Button variant={hasActiveFilters ? "default" : "outline"} size="icon">
+                  <Button
+                    variant={hasActiveFilters ? "default" : "outline"}
+                    className="h-11 shrink-0 gap-2"
+                  >
                     <Filter className="h-4 w-4" />
+                    Filtros
+                    {hasActiveFilters && (
+                      <span className="ml-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-background/25 text-[11px] font-semibold">
+                        !
+                      </span>
+                    )}
                   </Button>
                 </CollapsibleTrigger>
-              </Collapsible>
-            </div>
+              </div>
 
-            <Collapsible open={showFilters} onOpenChange={setShowFilters}>
               <CollapsibleContent className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-4 border-t border-border/70 pt-4 sm:grid-cols-2 lg:grid-cols-4">
                   <div className="space-y-2">
                     <Label>Estado</Label>
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -358,7 +390,7 @@ export default function TicketsActivosPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label>Tipo de Equipo</Label>
                     <Select value={equipmentFilter} onValueChange={setEquipmentFilter}>
@@ -373,18 +405,24 @@ export default function TicketsActivosPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   <div className="space-y-2">
-                    <Label>Fecha Desde</Label>
+                    <Label className="flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5" />
+                      Fecha Desde
+                    </Label>
                     <Input
                       type="date"
                       value={dateFrom}
                       onChange={(e) => setDateFrom(e.target.value)}
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
-                    <Label>Fecha Hasta</Label>
+                    <Label className="flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5" />
+                      Fecha Hasta
+                    </Label>
                     <Input
                       type="date"
                       value={dateTo}
@@ -392,71 +430,106 @@ export default function TicketsActivosPage() {
                     />
                   </div>
                 </div>
-                
+
                 {hasActiveFilters && (
-                  <Button variant="ghost" size="sm" onClick={clearFilters}>
+                  <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1.5">
+                    <X className="h-4 w-4" />
                     Limpiar filtros
                   </Button>
                 )}
               </CollapsibleContent>
-            </Collapsible>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Collapsible>
 
-        {/* Table */}
-        {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        {/* ── Resultados ─────────────────────────────── */}
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="flex items-center gap-2 text-lg font-semibold">
+              <ClipboardList className="h-5 w-5 text-primary" />
+              En taller
+            </h2>
+            {!loading && (
+              <Badge variant="secondary" className="font-normal">
+                {tickets.length} equipo{tickets.length !== 1 ? "s" : ""}
+              </Badge>
+            )}
           </div>
-        ) : (
-          <Card className="border-border">
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-28">Ticket</TableHead>
-                      <TableHead>Cliente</TableHead>
-                      <TableHead className="hidden sm:table-cell">Equipo</TableHead>
-                      <TableHead className="hidden md:table-cell">Marca/Modelo</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead className="hidden sm:table-cell">Fecha</TableHead>
-                      <TableHead className="hidden lg:table-cell">Total</TableHead>
-                      <TableHead className="w-28">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {tickets.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={8}
-                          className="py-8 text-center text-muted-foreground"
-                        >
-                          No se encontraron tickets
-                        </TableCell>
+
+          {loading ? (
+            <Card>
+              <CardContent className="space-y-3 p-5">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-4">
+                    <div className="h-5 w-16 rounded shimmer" />
+                    <div className="h-5 flex-1 rounded shimmer" />
+                    <div className="hidden h-5 w-28 rounded shimmer sm:block" />
+                    <div className="h-7 w-28 rounded-full shimmer" />
+                    <div className="h-8 w-20 rounded shimmer" />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ) : tickets.length === 0 ? (
+            <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-card/50 py-16 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-brand-soft">
+                <Search className="h-8 w-8 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium">No se encontraron tickets</p>
+                <p className="text-sm text-muted-foreground">
+                  Ajusta la búsqueda o limpia los filtros para ver más resultados.
+                </p>
+              </div>
+              {hasActiveFilters && (
+                <Button variant="outline" onClick={clearFilters} className="gap-1.5">
+                  <X className="h-4 w-4" />
+                  Limpiar filtros
+                </Button>
+              )}
+            </div>
+          ) : (
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="w-28">Ticket</TableHead>
+                        <TableHead>Cliente</TableHead>
+                        <TableHead className="hidden sm:table-cell">Equipo</TableHead>
+                        <TableHead className="hidden md:table-cell">Marca/Modelo</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead className="hidden sm:table-cell">Fecha</TableHead>
+                        <TableHead className="hidden lg:table-cell">Total</TableHead>
+                        <TableHead className="w-28 text-right">Acciones</TableHead>
                       </TableRow>
-                    ) : (
-                      tickets.map((ticket) => (
+                    </TableHeader>
+                    <TableBody>
+                      {tickets.map((ticket) => (
                         <TableRow
                           key={ticket.id}
-                          className="cursor-pointer hover:bg-muted/50"
+                          className="cursor-pointer transition-colors hover:bg-muted/50"
                           onClick={() => openTicketDetail(ticket)}
                         >
-                          <TableCell className="font-mono text-xs font-medium">
-                            {ticket.id}
+                          <TableCell className="font-mono text-xs font-semibold text-primary">
+                            {displayId(ticket)}
                           </TableCell>
                           <TableCell>
                             <div>
                               <p className="font-medium">{ticket.client_name}</p>
-                              <p className="text-xs text-muted-foreground">
+                              <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Smartphone className="h-3 w-3 shrink-0" />
                                 {ticket.client_phone}
                               </p>
                             </div>
                           </TableCell>
                           <TableCell className="hidden sm:table-cell">
-                            {EQUIPMENT_LABELS[ticket.equipment_type]}
+                            <Badge variant="secondary" className="font-normal">
+                              {EQUIPMENT_LABELS[ticket.equipment_type]}
+                            </Badge>
                           </TableCell>
-                          <TableCell className="hidden md:table-cell">
+                          <TableCell className="hidden text-muted-foreground md:table-cell">
                             {ticket.brand} {ticket.model}
                           </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
@@ -466,21 +539,13 @@ export default function TicketsActivosPage() {
                                 handleStatusChange(ticket.id, value as TicketStatus)
                               }
                             >
-                              <SelectTrigger className="h-8 w-36">
-                                <Badge
-                                  className={`${STATUS_COLORS[ticket.status]} text-xs`}
-                                >
-                                  {STATUS_LABELS[ticket.status]}
-                                </Badge>
+                              <SelectTrigger className="h-9 w-[150px] border-border/70">
+                                <StatusPill status={ticket.status} />
                               </SelectTrigger>
                               <SelectContent>
                                 {statusOptions.map((status) => (
                                   <SelectItem key={status} value={status}>
-                                    <Badge
-                                      className={`${STATUS_COLORS[status]} text-xs`}
-                                    >
-                                      {STATUS_LABELS[status]}
-                                    </Badge>
+                                    <StatusPill status={status} />
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -490,14 +555,16 @@ export default function TicketsActivosPage() {
                             {formatDate(ticket.created_at)}
                           </TableCell>
                           <TableCell className="hidden lg:table-cell">
-                            {ticket.total_cost > 0 ? (
-                              <span className="font-medium text-green-600">
-                                ${ticket.total_cost.toFixed(2)}
+                            {ticket.total_cost && ticket.total_cost > 0 ? (
+                              <span className="font-medium tabular-nums text-success">
+                                L. {ticket.total_cost.toFixed(2)}
                               </span>
-                            ) : '-'}
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
-                            <div className="flex gap-1">
+                            <div className="flex justify-end gap-0.5">
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -525,14 +592,14 @@ export default function TicketsActivosPage() {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </section>
       </div>
 
       {/* Ticket Detail Dialog */}
@@ -544,23 +611,23 @@ export default function TicketsActivosPage() {
           {selectedTicket && (
             <>
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-3">
-                  <span className="font-mono text-sm">{selectedTicket.id}</span>
-                  <Badge className={STATUS_COLORS[selectedTicket.status]}>
-                    {STATUS_LABELS[selectedTicket.status]}
-                  </Badge>
-                  {selectedTicket.total_cost > 0 && (
-                    <Badge variant={selectedTicket.amount_paid >= selectedTicket.total_cost ? "default" : "destructive"}>
-                      {selectedTicket.amount_paid >= selectedTicket.total_cost ? "Pagado" : "Pendiente"}
+                <DialogTitle className="flex flex-wrap items-center gap-3">
+                  <span className="font-mono text-sm font-bold text-primary">
+                    {displayId(selectedTicket)}
+                  </span>
+                  <StatusPill status={selectedTicket.status} />
+                  {selectedTicket.total_cost != null && selectedTicket.total_cost > 0 && (
+                    <Badge variant={(selectedTicket.amount_paid ?? 0) >= selectedTicket.total_cost ? "default" : "destructive"}>
+                      {(selectedTicket.amount_paid ?? 0) >= selectedTicket.total_cost ? "Pagado" : "Pendiente"}
                     </Badge>
                   )}
                 </DialogTitle>
               </DialogHeader>
 
-              <div className="space-y-6 pt-4">
+              <div className="space-y-6 pt-2">
                 {/* Client Info */}
-                <div className="space-y-3 rounded-lg border border-border p-4">
-                  <p className="text-sm font-medium text-foreground">Datos del cliente</p>
+                <div className="space-y-3 rounded-2xl border border-border/70 bg-muted/30 p-4">
+                  <p className="text-sm font-semibold text-foreground">Datos del cliente</p>
                   <div className="space-y-2">
                     <Label htmlFor="edit-client-name">Nombre</Label>
                     <Input
@@ -579,6 +646,14 @@ export default function TicketsActivosPage() {
                         className="sm:flex-1"
                       />
                       <CustomerHistory phone={selectedTicket.client_phone} name={selectedTicket.client_name} />
+                    </div>
+                    <div className="mt-2">
+                      <PhoneActions
+                        phone={selectedTicket.client_phone}
+                        templates={buildTicketWhatsAppTemplates(selectedTicket)}
+                        showLabels
+                        size="sm"
+                      />
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -602,44 +677,46 @@ export default function TicketsActivosPage() {
                 </div>
 
                 {/* Equipment Info */}
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Tipo</p>
-                    <p className="font-medium">
-                      {EQUIPMENT_LABELS[selectedTicket.equipment_type]}
+                <div className="rounded-2xl border border-border/70 p-4">
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Tipo</p>
+                      <p className="font-medium">
+                        {EQUIPMENT_LABELS[selectedTicket.equipment_type]}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Marca</p>
+                      <p className="font-medium">{selectedTicket.brand || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Modelo</p>
+                      <p className="font-medium">{selectedTicket.model || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Serie</p>
+                      <p className="font-medium">
+                        {selectedTicket.serial_number || "-"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 border-t border-border/70 pt-4">
+                    <p className="text-xs text-muted-foreground">Contraseña del equipo</p>
+                    <p className="font-mono font-medium">
+                      {selectedTicket.device_password?.trim() || "—"}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Marca</p>
-                    <p className="font-medium">{selectedTicket.brand || "-"}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Modelo</p>
-                    <p className="font-medium">{selectedTicket.model || "-"}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Serie</p>
-                    <p className="font-medium">
-                      {selectedTicket.serial_number || "-"}
-                    </p>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Contraseña del equipo</p>
-                  <p className="font-medium font-mono">
-                    {selectedTicket.device_password?.trim() || "—"}
-                  </p>
                 </div>
 
                 {/* Dates */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">Fecha de Recepción</p>
+                    <p className="text-xs text-muted-foreground">Fecha de Recepción</p>
                     <p className="font-medium">{formatDate(selectedTicket.created_at)}</p>
                   </div>
                   {selectedTicket.estimated_delivery_date && (
                     <div>
-                      <p className="text-sm text-muted-foreground">Entrega Estimada</p>
+                      <p className="text-xs text-muted-foreground">Entrega Estimada</p>
                       <p className="font-medium">{formatDate(selectedTicket.estimated_delivery_date)}</p>
                     </div>
                   )}
@@ -647,14 +724,14 @@ export default function TicketsActivosPage() {
 
                 {/* Problem */}
                 <div>
-                  <p className="text-sm text-muted-foreground">Problema Reportado</p>
+                  <p className="text-xs text-muted-foreground">Problema Reportado</p>
                   <p className="font-medium">{selectedTicket.problem_description}</p>
                 </div>
 
                 {/* Photos */}
                 {selectedTicket.photos && selectedTicket.photos.length > 0 && (
                   <div>
-                    <p className="text-sm text-muted-foreground mb-2 flex items-center gap-2">
+                    <p className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
                       <ImageIcon className="h-4 w-4" />
                       Fotos del Equipo
                     </p>
@@ -664,7 +741,7 @@ export default function TicketsActivosPage() {
                           <img
                             src={photo}
                             alt={`Foto ${index + 1}`}
-                            className="w-full aspect-square object-cover rounded-lg border hover:opacity-80 transition-opacity"
+                            className="aspect-square w-full rounded-lg border object-cover transition-opacity hover:opacity-80"
                           />
                         </a>
                       ))}
@@ -674,7 +751,7 @@ export default function TicketsActivosPage() {
 
                 {/* Accessories */}
                 <div>
-                  <p className="mb-2 text-sm text-muted-foreground">
+                  <p className="mb-2 text-xs text-muted-foreground">
                     Accesorios Recibidos
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -694,8 +771,8 @@ export default function TicketsActivosPage() {
 
                 {/* Diagnosis & Repair (editable) */}
                 {editMode ? (
-                  <div className="space-y-4 p-4 bg-muted rounded-lg">
-                    <div>
+                  <div className="space-y-4 rounded-2xl border border-border/70 bg-muted/40 p-4">
+                    <div className="space-y-2">
                       <Label>Diagnóstico</Label>
                       <Textarea
                         value={editDiagnosis}
@@ -703,7 +780,7 @@ export default function TicketsActivosPage() {
                         placeholder="Resultado del diagnóstico..."
                       />
                     </div>
-                    <div>
+                    <div className="space-y-2">
                       <Label>Notas de Reparación</Label>
                       <Textarea
                         value={editRepairNotes}
@@ -712,8 +789,8 @@ export default function TicketsActivosPage() {
                       />
                     </div>
                     <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <Label>Mano de Obra ($)</Label>
+                      <div className="space-y-2">
+                        <Label>Mano de Obra (L.)</Label>
                         <Input
                           type="number"
                           value={editLaborCost}
@@ -722,8 +799,8 @@ export default function TicketsActivosPage() {
                           step="0.01"
                         />
                       </div>
-                      <div>
-                        <Label>Piezas ($)</Label>
+                      <div className="space-y-2">
+                        <Label>Piezas (L.)</Label>
                         <Input
                           type="number"
                           value={editPartsCost}
@@ -732,8 +809,8 @@ export default function TicketsActivosPage() {
                           step="0.01"
                         />
                       </div>
-                      <div>
-                        <Label>Total ($)</Label>
+                      <div className="space-y-2">
+                        <Label>Total (L.)</Label>
                         <Input
                           type="number"
                           value={(parseFloat(editLaborCost || '0') + parseFloat(editPartsCost || '0')).toFixed(2)}
@@ -742,8 +819,8 @@ export default function TicketsActivosPage() {
                         />
                       </div>
                     </div>
-                    <div>
-                      <Label>Monto Pagado ($)</Label>
+                    <div className="space-y-2">
+                      <Label>Monto Pagado (L.)</Label>
                       <Input
                         type="number"
                         value={editAmountPaid}
@@ -763,72 +840,76 @@ export default function TicketsActivosPage() {
                       <>
                         {selectedTicket.diagnosis && (
                           <div>
-                            <p className="text-sm text-muted-foreground">Diagnóstico</p>
+                            <p className="text-xs text-muted-foreground">Diagnóstico</p>
                             <p className="font-medium">{selectedTicket.diagnosis}</p>
                           </div>
                         )}
                         {selectedTicket.repair_notes && (
                           <div>
-                            <p className="text-sm text-muted-foreground">Notas de Reparación</p>
+                            <p className="text-xs text-muted-foreground">Notas de Reparación</p>
                             <p className="font-medium">{selectedTicket.repair_notes}</p>
                           </div>
                         )}
                       </>
                     )}
-                    
-                    {selectedTicket.total_cost > 0 && (
-                      <div className="grid grid-cols-4 gap-4 p-3 bg-muted rounded-lg">
+
+                    {selectedTicket.total_cost != null && selectedTicket.total_cost > 0 && (
+                      <div className="grid grid-cols-2 gap-4 rounded-2xl border border-border/70 bg-muted/30 p-4 sm:grid-cols-4">
                         <div>
                           <p className="text-xs text-muted-foreground">Mano de Obra</p>
-                          <p className="font-medium">${selectedTicket.labor_cost?.toFixed(2) || '0.00'}</p>
+                          <p className="font-medium tabular-nums">L. {selectedTicket.labor_cost?.toFixed(2) || '0.00'}</p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">Piezas</p>
-                          <p className="font-medium">${selectedTicket.parts_cost?.toFixed(2) || '0.00'}</p>
+                          <p className="font-medium tabular-nums">L. {selectedTicket.parts_cost?.toFixed(2) || '0.00'}</p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">Total</p>
-                          <p className="font-bold text-green-600">${selectedTicket.total_cost?.toFixed(2) || '0.00'}</p>
+                          <p className="font-bold tabular-nums text-success">L. {selectedTicket.total_cost?.toFixed(2) || '0.00'}</p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">Pagado</p>
-                          <p className="font-medium">${selectedTicket.amount_paid?.toFixed(2) || '0.00'}</p>
+                          <p className="font-medium tabular-nums">L. {selectedTicket.amount_paid?.toFixed(2) || '0.00'}</p>
                         </div>
                       </div>
                     )}
-                    
-                    <Button variant="outline" onClick={() => setEditMode(true)}>
+
+                    <Button variant="outline" onClick={() => setEditMode(true)} className="gap-2">
+                      <Pencil className="h-4 w-4" />
                       Editar Diagnóstico y Costos
                     </Button>
                   </div>
                 )}
 
                 {/* Actions */}
-                <div className="space-y-4 border-t pt-4">
-                  <Select
-                    value={selectedTicket.status}
-                    onValueChange={(value) =>
-                      handleStatusChange(selectedTicket.id, value as TicketStatus)
-                    }
-                  >
-                    <SelectTrigger className="w-48">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {statusOptions.map((status) => (
-                        <SelectItem key={status} value={status}>
-                          {STATUS_LABELS[status]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  
+                <div className="space-y-4 border-t border-border/70 pt-4">
+                  <div className="space-y-2">
+                    <Label>Cambiar estado</Label>
+                    <Select
+                      value={selectedTicket.status}
+                      onValueChange={(value) =>
+                        handleStatusChange(selectedTicket.id, value as TicketStatus)
+                      }
+                    >
+                      <SelectTrigger className="w-full sm:w-56">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {statusOptions.map((status) => (
+                          <SelectItem key={status} value={status}>
+                            {STATUS_LABELS[status]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <Button onClick={() => handleCustomerPrint(selectedTicket)} className="h-12">
+                    <Button onClick={() => handleCustomerPrint(selectedTicket)} size="lg" className="h-12">
                       <Printer className="mr-2 h-4 w-4" />
                       Comprobante (cliente)
                     </Button>
-                    <Button variant="secondary" onClick={() => handleInternalPrint(selectedTicket)} className="h-12">
+                    <Button variant="secondary" onClick={() => handleInternalPrint(selectedTicket)} size="lg" className="h-12">
                       <Tag className="mr-2 h-4 w-4" />
                       POS / Etiquetas (Interno)
                     </Button>
@@ -843,14 +924,14 @@ export default function TicketsActivosPage() {
       {/* Print Dialogs */}
       {printTicket && (
         <>
-          <PrintCustomer 
-            ticket={printTicket} 
-            open={showCustomerPrint} 
+          <PrintCustomer
+            ticket={printTicket}
+            open={showCustomerPrint}
             onOpenChange={setShowCustomerPrint}
           />
-          <PrintInternal 
-            ticket={printTicket} 
-            open={showInternalPrint} 
+          <PrintInternal
+            ticket={printTicket}
+            open={showInternalPrint}
             onOpenChange={setShowInternalPrint}
           />
         </>

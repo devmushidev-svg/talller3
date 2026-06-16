@@ -2,20 +2,13 @@
 
 import { useState, useEffect } from "react"
 import { DashboardLayout } from "@/components/dashboard-layout"
+import { PageHeader } from "@/components/page-header"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import {
   Dialog,
   DialogContent,
@@ -40,14 +33,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { 
-  Part, 
+import {
+  Part,
   PartCondition,
-  PART_CATEGORIES, 
+  PART_CATEGORIES,
   PART_CONDITION_LABELS,
-  PART_CONDITION_COLORS 
+  PART_CONDITION_COLORS,
 } from "@/lib/types"
-import { Search, Plus, Pencil, Trash2, Loader2, Package } from "lucide-react"
+import {
+  Search,
+  Plus,
+  Pencil,
+  Trash2,
+  Loader2,
+  Package,
+  Boxes,
+  Tag,
+  Layers,
+  Ruler,
+} from "lucide-react"
 
 interface PartFormData {
   name: string
@@ -67,6 +71,13 @@ const emptyPart: PartFormData = {
   condition: "bueno",
   notes: "",
   quantity: 1,
+}
+
+/** Color por condición (variable CSS, se adapta a claro/oscuro) — barra de acento e icono */
+const CONDITION_VAR: Record<PartCondition, string> = {
+  bueno: "var(--success)",
+  medio: "var(--warning)",
+  malo: "var(--destructive)",
 }
 
 export default function InventarioPage() {
@@ -98,13 +109,16 @@ export default function InventarioPage() {
   }, [])
 
   const filteredParts = parts.filter((part) => {
-    const matchesSearch = 
+    const matchesSearch =
       part.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (part.model && part.model.toLowerCase().includes(searchTerm.toLowerCase()))
     const matchesCategory = categoryFilter === "all" || part.category === categoryFilter
     const matchesCondition = conditionFilter === "all" || part.condition === conditionFilter
     return matchesSearch && matchesCategory && matchesCondition
   })
+
+  const totalUnits = parts.reduce((sum, p) => sum + (p.quantity || 0), 0)
+  const categoriesInUse = new Set(parts.map((p) => p.category)).size
 
   const handleOpenDialog = (part?: Part) => {
     if (part) {
@@ -169,41 +183,93 @@ export default function InventarioPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      </DashboardLayout>
-    )
-  }
+  const statCards = [
+    {
+      title: "Piezas distintas",
+      value: parts.length,
+      icon: Package,
+      tint: "var(--chart-1)",
+    },
+    {
+      title: "Unidades en stock",
+      value: totalUnits,
+      icon: Boxes,
+      tint: "var(--chart-2)",
+    },
+    {
+      title: "Categorías activas",
+      value: categoriesInUse,
+      icon: Layers,
+      tint: "var(--warning)",
+    },
+    {
+      title: "Resultados visibles",
+      value: filteredParts.length,
+      icon: Tag,
+      tint: "var(--success)",
+    },
+  ]
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">
-              Inventario de Piezas
-            </h1>
-            <p className="text-muted-foreground">
-              {parts.length} piezas almacenadas
-            </p>
-          </div>
-          <Button onClick={() => handleOpenDialog()} size="lg">
-            <Plus className="mr-2 h-4 w-4" />
-            Agregar Pieza
-          </Button>
+      <div className="space-y-8">
+        <PageHeader
+          icon={Package}
+          title="Inventario de Piezas"
+          description={`${parts.length} pieza${parts.length !== 1 ? "s" : ""} almacenada${parts.length !== 1 ? "s" : ""} en el taller.`}
+          action={
+            <Button onClick={() => handleOpenDialog()} size="lg">
+              <Plus className="mr-2 h-5 w-5" />
+              Agregar pieza
+            </Button>
+          }
+        />
+
+        {/* ── Métricas ───────────────────────────── */}
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 stagger">
+          {statCards.map((c) => (
+            <div
+              key={c.title}
+              className="hover-lift relative overflow-hidden rounded-2xl border border-border/70 bg-card p-4 sm:p-5"
+            >
+              <div
+                className="absolute -right-6 -top-6 h-20 w-20 rounded-full opacity-[0.12]"
+                style={{ background: c.tint }}
+                aria-hidden
+              />
+              <div className="flex items-center gap-3">
+                <span
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+                  style={{
+                    backgroundColor: `color-mix(in oklch, ${c.tint} 15%, transparent)`,
+                    color: c.tint,
+                  }}
+                >
+                  <c.icon className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  {loading ? (
+                    <div className="h-7 w-10 rounded-md shimmer" />
+                  ) : (
+                    <p className="text-2xl font-bold leading-none tabular-nums">
+                      {c.value}
+                    </p>
+                  )}
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                    {c.title}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
 
-        {/* Filters */}
+        {/* ── Filtros ───────────────────────────── */}
         <Card>
-          <CardContent className="py-4">
+          <CardContent className="p-5">
             <div className="flex flex-col gap-3 sm:flex-row">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Buscar por nombre o modelo..."
                   value={searchTerm}
@@ -212,7 +278,7 @@ export default function InventarioPage() {
                 />
               </div>
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-full sm:w-44">
+                <SelectTrigger className="w-full sm:w-48">
                   <SelectValue placeholder="Categoría" />
                 </SelectTrigger>
                 <SelectContent>
@@ -225,7 +291,7 @@ export default function InventarioPage() {
                 </SelectContent>
               </Select>
               <Select value={conditionFilter} onValueChange={setConditionFilter}>
-                <SelectTrigger className="w-full sm:w-36">
+                <SelectTrigger className="w-full sm:w-40">
                   <SelectValue placeholder="Estado" />
                 </SelectTrigger>
                 <SelectContent>
@@ -239,105 +305,145 @@ export default function InventarioPage() {
           </CardContent>
         </Card>
 
-        {/* Table */}
-        <Card className="border-border">
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead className="hidden md:table-cell">Modelo</TableHead>
-                    <TableHead className="hidden lg:table-cell">Tamaño</TableHead>
-                    <TableHead className="hidden sm:table-cell">Categoría</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-center">Cant.</TableHead>
-                    <TableHead className="w-24">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredParts.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={7}
-                        className="py-12 text-center"
-                      >
-                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                          <Package className="h-10 w-10" />
-                          <p>No se encontraron piezas</p>
-                          {parts.length === 0 && (
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleOpenDialog()}
-                            >
-                              Agregar primera pieza
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredParts.map((part) => (
-                      <TableRow key={part.id}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{part.name}</p>
-                            <p className="text-sm text-muted-foreground sm:hidden">
-                              {part.category}
-                            </p>
-                            {part.notes && (
-                              <p className="text-xs text-muted-foreground line-clamp-1">
-                                {part.notes}
-                              </p>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          {part.model || "-"}
-                        </TableCell>
-                        <TableCell className="hidden lg:table-cell">
-                          {part.size || "-"}
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell">
-                          {part.category}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={PART_CONDITION_COLORS[part.condition as PartCondition] || PART_CONDITION_COLORS.bueno}>
-                            {PART_CONDITION_LABELS[part.condition as PartCondition] || 'Bueno'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant="secondary" className="font-mono">
-                            {part.quantity}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleOpenDialog(part)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setDeleteId(part.id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+        {/* ── Listado de piezas ───────────────────── */}
+        {loading ? (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-44 rounded-2xl border border-border/70 bg-card p-5"
+              >
+                <div className="h-5 w-28 rounded shimmer" />
+                <div className="mt-4 h-6 w-40 rounded shimmer" />
+                <div className="mt-3 h-4 w-full rounded shimmer" />
+                <div className="mt-2 h-4 w-2/3 rounded shimmer" />
+              </div>
+            ))}
+          </div>
+        ) : filteredParts.length === 0 ? (
+          <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-card/50 py-16 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-brand-soft">
+              <Package className="h-8 w-8 text-primary" />
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <p className="font-medium">No se encontraron piezas</p>
+              <p className="text-sm text-muted-foreground">
+                {parts.length === 0
+                  ? "Empieza agregando tu primera pieza al inventario."
+                  : "Prueba ajustando la búsqueda o los filtros."}
+              </p>
+            </div>
+            {parts.length === 0 && (
+              <Button onClick={() => handleOpenDialog()}>
+                <Plus className="mr-2 h-4 w-4" />
+                Agregar primera pieza
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 stagger">
+            {filteredParts.map((part) => {
+              const condition = (part.condition as PartCondition) || "bueno"
+              const color = CONDITION_VAR[condition] || CONDITION_VAR.bueno
+              return (
+                <article
+                  key={part.id}
+                  className="hover-lift group relative flex flex-col overflow-hidden rounded-2xl border border-border/70 bg-card"
+                >
+                  {/* Barra de acento por condición */}
+                  <span
+                    className="absolute inset-y-0 left-0 w-1.5"
+                    style={{ background: color }}
+                    aria-hidden
+                  />
+
+                  <div className="flex flex-1 flex-col gap-3 p-5 pl-6">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span
+                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                          style={{
+                            backgroundColor: `color-mix(in oklch, ${color} 15%, transparent)`,
+                            color,
+                          }}
+                        >
+                          <Package className="h-5 w-5" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold leading-tight">
+                            {part.name}
+                          </p>
+                          <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Tag className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">{part.category}</span>
+                          </p>
+                        </div>
+                      </div>
+                      <Badge
+                        className={`${
+                          PART_CONDITION_COLORS[condition] || PART_CONDITION_COLORS.bueno
+                        } shrink-0`}
+                      >
+                        {PART_CONDITION_LABELS[condition] || "Bueno"}
+                      </Badge>
+                    </div>
+
+                    {(part.model || part.size) && (
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        {part.model && (
+                          <span className="flex items-center gap-1.5">
+                            <Layers className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">{part.model}</span>
+                          </span>
+                        )}
+                        {part.size && (
+                          <span className="flex items-center gap-1.5">
+                            <Ruler className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">{part.size}</span>
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {part.notes && (
+                      <p className="line-clamp-2 text-sm leading-snug text-foreground/80">
+                        {part.notes}
+                      </p>
+                    )}
+
+                    <div className="mt-auto flex items-center gap-2 pt-1">
+                      <Boxes className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">En stock:</span>
+                      <Badge variant="secondary" className="font-mono tabular-nums">
+                        {part.quantity}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {/* Pie: acciones */}
+                  <div className="flex items-center justify-end gap-1 border-t border-border/70 bg-muted/30 px-5 py-2.5 pl-6">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleOpenDialog(part)}
+                    >
+                      <Pencil className="mr-1.5 h-4 w-4" />
+                      Editar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setDeleteId(part.id)}
+                      aria-label="Eliminar pieza"
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* Add/Edit Dialog */}
