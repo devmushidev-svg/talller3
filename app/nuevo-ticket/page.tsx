@@ -44,6 +44,7 @@ import { PhotoUpload } from "@/components/photo-upload"
 import { getLocalDateInputValue, getTomorrowDateInputValue } from "@/lib/date-utils"
 import { CustomerHistory } from "@/components/customer-history"
 import { CustomerTicket, type CustomerTicketHandle } from "@/components/customer-ticket"
+import { AccessoryLabels, type AccessoryLabelsHandle } from "@/components/accessory-labels"
 
 export default function NuevoTicketPage() {
   const [clientName, setClientName] = useState("")
@@ -75,6 +76,7 @@ export default function NuevoTicketPage() {
     printer_width: "80mm",
   }))
   const customerTicketRef = useRef<CustomerTicketHandle>(null)
+  const accessoryLabelsRef = useRef<AccessoryLabelsHandle>(null)
   const [saving, setSaving] = useState(false)
   const [customerExists, setCustomerExists] = useState(false)
   const [equipmentSelectOpen, setEquipmentSelectOpen] = useState(false)
@@ -305,9 +307,17 @@ export default function NuevoTicketPage() {
           .then((r) => r.json())
           .then((data) => { if (data && !data.error) setPrintSettings(data) })
           .catch(() => {})
-        window.setTimeout(() => {
+        // 2 copias de la orden (cliente + taller) + etiquetas de accesorios.
+        // ponytail: delays entre trabajos para que los iframes de impresión no colisionen.
+        const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+        void (async () => {
+          await sleep(900)
           customerTicketRef.current?.print()
-        }, 900)
+          await sleep(700)
+          customerTicketRef.current?.print()
+          await sleep(700)
+          accessoryLabelsRef.current?.print() // no-op si no hay accesorios
+        })()
       } else {
         alert(`Ticket ${ticket.id} creado correctamente`)
         resetForm()
@@ -770,6 +780,7 @@ export default function NuevoTicketPage() {
             settings={printSettings}
             hideTrigger
           />
+          <AccessoryLabels ref={accessoryLabelsRef} ticket={savedTicket} hideTrigger />
         </div>
       )}
     </DashboardLayout>
