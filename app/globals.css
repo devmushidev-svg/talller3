@@ -240,17 +240,20 @@
     transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
                 box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1);
   }
-  .hover-lift:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 12px 28px -10px oklch(0.5 0.1 275 / 0.35);
-  }
-
   /* Brillo que recorre (carga) */
   .shimmer {
     background: linear-gradient(90deg,
       var(--muted) 25%, color-mix(in oklch, var(--muted) 60%, white) 37%, var(--muted) 63%);
     background-size: 200% 100%;
     animation: shimmer 1.4s ease infinite;
+  }
+}
+
+/* Evita el estado hover "pegado" y los saltos de tarjetas en pantallas táctiles. */
+@media (hover: hover) and (pointer: fine) {
+  .hover-lift:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 28px -10px oklch(0.5 0.1 275 / 0.35);
   }
 }
 

@@ -3,13 +3,39 @@ import { NextResponse } from "next/server"
 import { upsertCustomerByPhone } from "@/lib/customers"
 import { normalizeCustomerPhone } from "@/lib/utils"
 
-export async function GET() {
+const DASHBOARD_ACTIVE_STATUSES = [
+  "recibido",
+  "received",
+  "en_diagnostico",
+  "en_reparacion",
+  "listo",
+]
+
+function parseLimit(value: string | null) {
+  if (!value || !/^\d{1,3}$/.test(value)) return null
+  const parsed = Number(value)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? Math.min(parsed, 100) : null
+}
+
+export async function GET(request: Request) {
   const supabase = await createClient()
+  const { searchParams } = new URL(request.url)
+  const scope = searchParams.get("scope")
+  const limit = parseLimit(searchParams.get("limit"))
   
-  const { data, error } = await supabase
+  let query = supabase
     .from("tickets")
     .select("*")
     .order("created_at", { ascending: false })
+
+  if (scope === "active") {
+    query = query.in("status", DASHBOARD_ACTIVE_STATUSES)
+  }
+  if (limit !== null) {
+    query = query.limit(limit)
+  }
+
+  const { data, error } = await query
   
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

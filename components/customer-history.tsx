@@ -156,9 +156,9 @@ export function CustomerHistory({ phone, name }: CustomerHistoryProps) {
                             })}
                           </p>
                         </div>
-                        {ticket.total_cost > 0 && (
+                        {(ticket.total_cost ?? 0) > 0 && (
                           <span className="font-medium text-green-600">
-                            ${ticket.total_cost.toFixed(2)}
+                            L. {(ticket.total_cost ?? 0).toFixed(2)}
                           </span>
                         )}
                       </div>

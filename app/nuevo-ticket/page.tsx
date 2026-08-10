@@ -39,12 +39,25 @@ import {
   Package,
   Keyboard,
   CheckCircle2,
+  Database,
+  Sparkles,
 } from "lucide-react"
 import { PhotoUpload } from "@/components/photo-upload"
 import { getLocalDateInputValue, getTomorrowDateInputValue } from "@/lib/date-utils"
 import { CustomerHistory } from "@/components/customer-history"
 import { CustomerTicket, type CustomerTicketHandle } from "@/components/customer-ticket"
 import { AccessoryLabels, type AccessoryLabelsHandle } from "@/components/accessory-labels"
+import {
+  TICKET_QUICK_TEMPLATES,
+  type TicketQuickTemplate,
+} from "./ticket-templates"
+
+interface ModelSuggestion {
+  model: string
+  brand: string | null
+  equipmentType: EquipmentType | null
+  count: number
+}
 
 export default function NuevoTicketPage() {
   const [clientName, setClientName] = useState("")
@@ -80,8 +93,14 @@ export default function NuevoTicketPage() {
   const [saving, setSaving] = useState(false)
   const [customerExists, setCustomerExists] = useState(false)
   const [equipmentSelectOpen, setEquipmentSelectOpen] = useState(false)
+  const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(null)
+  const [modelSuggestions, setModelSuggestions] = useState<ModelSuggestion[]>([])
+  const [modelSuggestionsLoading, setModelSuggestionsLoading] = useState(false)
+  const [modelSuggestionsError, setModelSuggestionsError] = useState(false)
+  const customerLookupRequestRef = useRef(0)
+  const autoFilledCustomerNameRef = useRef<string | null>(null)
 
-  /** Navegación rápida: ↑ ↓ y Enter hasta “Problema”; desde Accesorios el flujo sigue con el ratón. */
+  /** Navegación rápida con Enter hasta “Problema”; las flechas conservan su función natural. */
   const kbReceivedByRef = useRef<HTMLInputElement>(null)
   const kbClientNameRef = useRef<HTMLInputElement>(null)
   const kbClientPhoneRef = useRef<HTMLInputElement>(null)
@@ -144,62 +163,134 @@ export default function NuevoTicketPage() {
         }
         focusKbField(index + 1)
       }
-      const goPrev = () => {
-        e.preventDefault()
-        if (index <= 0) return
-        focusKbField(index - 1)
-      }
-
-      if (e.key === "ArrowDown" || e.key === "ArrowRight") {
-        if (index === 3 && equipmentSelectOpen) return
-        goNext()
-        return
-      }
-      if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
-        if (index === 3 && equipmentSelectOpen) return
-        goPrev()
-        return
-      }
       if (e.key === "Enter") {
         if (e.target instanceof HTMLTextAreaElement && e.shiftKey) return
         if (index === 3 && e.target instanceof HTMLButtonElement) return
         goNext()
       }
     },
-    [equipmentSelectOpen, focusKbField, scrollToAccessoriesAndEndKeyboard]
+    [focusKbField, scrollToAccessoriesAndEndKeyboard]
   )
 
   // Check if customer exists when phone changes
   useEffect(() => {
-    const checkCustomer = async () => {
-      if (clientPhone.length >= 8) {
-        try {
-          const response = await fetch(`/api/customers?phone=${encodeURIComponent(clientPhone)}`)
-          if (response.ok) {
-            const customers = await response.json()
-            if (customers.length > 0) {
-              setCustomerExists(true)
-              // Auto-fill name if empty
-              if (!clientName && customers[0].name) {
-                setClientName(customers[0].name)
-              }
-            } else {
-              setCustomerExists(false)
-            }
-          }
-        } catch (error) {
-          console.error('Error checking customer:', error)
+    const phone = clientPhone.trim()
+    const requestId = ++customerLookupRequestRef.current
+    setCustomerExists(false)
+
+    if (phone.length < 8) {
+      setClientName((currentName) => {
+        if (autoFilledCustomerNameRef.current === currentName) {
+          autoFilledCustomerNameRef.current = null
+          return ""
         }
-      } else {
-        setCustomerExists(false)
-      }
+        return currentName
+      })
+      return
     }
 
-    const debounce = setTimeout(checkCustomer, 500)
-    return () => clearTimeout(debounce)
-  }, [clientPhone, clientName])
+    const controller = new AbortController()
+    const debounce = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/customers?phone=${encodeURIComponent(phone)}`, {
+          signal: controller.signal,
+          cache: "no-store",
+        })
+        if (!response.ok) return
+
+        const customers = await response.json()
+        if (controller.signal.aborted || requestId !== customerLookupRequestRef.current) return
+
+        const firstCustomer = Array.isArray(customers) ? customers[0] : undefined
+        setCustomerExists(Boolean(firstCustomer))
+        if (firstCustomer?.name) {
+          setClientName((currentName) => {
+            const previousAutoFill = autoFilledCustomerNameRef.current
+            if (!currentName || currentName === previousAutoFill) {
+              autoFilledCustomerNameRef.current = firstCustomer.name
+              return firstCustomer.name
+            }
+            return currentName
+          })
+        } else {
+          setClientName((currentName) => {
+            if (autoFilledCustomerNameRef.current === currentName) {
+              autoFilledCustomerNameRef.current = null
+              return ""
+            }
+            return currentName
+          })
+        }
+      } catch (error) {
+        if (controller.signal.aborted) return
+        console.error("Error checking customer:", error)
+      }
+    }, 500)
+
+    return () => {
+      window.clearTimeout(debounce)
+      controller.abort()
+    }
+  }, [clientPhone])
+
+  // Modelos más usados del historial, filtrados por el tipo, la marca y lo escrito.
+  useEffect(() => {
+    if (savedTicket) {
+      setModelSuggestions([])
+      setModelSuggestionsLoading(false)
+      return
+    }
+
+    const controller = new AbortController()
+    const debounce = window.setTimeout(async () => {
+      const params = new URLSearchParams({
+        equipmentType,
+        limit: "6",
+      })
+      if (brand.trim()) params.set("brand", brand.trim())
+      if (model.trim()) params.set("q", model.trim())
+
+      setModelSuggestionsLoading(true)
+      setModelSuggestionsError(false)
+
+      try {
+        const response = await fetch(`/api/tickets/suggestions?${params.toString()}`, {
+          signal: controller.signal,
+          cache: "no-store",
+        })
+        if (!response.ok) throw new Error("No se pudieron cargar los modelos")
+
+        const payload = (await response.json()) as { models?: ModelSuggestion[] }
+        setModelSuggestions(Array.isArray(payload.models) ? payload.models : [])
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return
+        setModelSuggestions([])
+        setModelSuggestionsError(true)
+      } finally {
+        if (!controller.signal.aborted) setModelSuggestionsLoading(false)
+      }
+    }, 250)
+
+    return () => {
+      window.clearTimeout(debounce)
+      controller.abort()
+    }
+  }, [brand, equipmentType, model, savedTicket])
+
+  const handleApplyTemplate = (template: TicketQuickTemplate) => {
+    setEquipmentType(template.equipmentType)
+    setAccessories([...template.accessories])
+    setProblemDescription(template.problemDescription)
+    setAppliedTemplateId(template.id)
+  }
+
+  const handleModelSuggestion = (suggestion: ModelSuggestion) => {
+    setModel(suggestion.model)
+    if (!brand.trim() && suggestion.brand) setBrand(suggestion.brand)
+  }
 
   const handleAccessoryChange = (checkboxLabel: string, checked: boolean) => {
+    setAppliedTemplateId(null)
     setAccessories((prev) => {
       if (checked) {
         if (prev.some((a) => accessoryMatchesCheckbox(a, checkboxLabel))) return prev
@@ -212,11 +303,13 @@ export default function NuevoTicketPage() {
   const handleAddOtherAccessory = () => {
     const text = otherAccessoryInput.trim()
     if (!text) return
+    setAppliedTemplateId(null)
     setAccessories((prev) => [...prev, text])
     setOtherAccessoryInput("")
   }
 
   const removeAccessory = (item: string) => {
+    setAppliedTemplateId(null)
     setAccessories((prev) => prev.filter((a) => a !== item))
   }
 
@@ -237,6 +330,8 @@ export default function NuevoTicketPage() {
     setPhotos([])
     setSavedTicket(null)
     setCustomerExists(false)
+    setAppliedTemplateId(null)
+    autoFilledCustomerNameRef.current = null
   }
 
   const handleSave = async (openPrintDialog: boolean = false) => {
@@ -334,6 +429,10 @@ export default function NuevoTicketPage() {
     resetForm()
   }
 
+  const appliedTemplate = TICKET_QUICK_TEMPLATES.find(
+    (template) => template.id === appliedTemplateId
+  )
+
   return (
     <DashboardLayout>
       <div className="mx-auto max-w-4xl space-y-8">
@@ -350,12 +449,9 @@ export default function NuevoTicketPage() {
               <Keyboard className="h-5 w-5" />
             </span>
             <p className="leading-relaxed text-muted-foreground">
-              <kbd className="rounded border bg-card px-1.5 py-0.5 text-xs font-medium text-foreground">↑</kbd>{" "}
-              <kbd className="rounded border bg-card px-1.5 py-0.5 text-xs font-medium text-foreground">↓</kbd>{" "}
-              <kbd className="rounded border bg-card px-1.5 py-0.5 text-xs font-medium text-foreground">←</kbd>{" "}
-              <kbd className="rounded border bg-card px-1.5 py-0.5 text-xs font-medium text-foreground">→</kbd>{" "}
               <kbd className="rounded border bg-card px-1.5 py-0.5 text-xs font-medium text-foreground">Enter</kbd>{" "}
               para moverse entre campos hasta <strong className="text-foreground">Problema</strong>.
+              Las flechas siguen disponibles para mover el cursor y recorrer sugerencias. {" "}
               En <strong className="text-foreground">Accesorios</strong> use el ratón (y el botón
               imprimir). En el cuadro de texto:{" "}
               <kbd className="rounded border bg-card px-1.5 py-0.5 text-xs font-medium text-foreground">Shift</kbd>{" "}
@@ -413,7 +509,10 @@ export default function NuevoTicketPage() {
                     ref={kbClientNameRef}
                     id="clientName"
                     value={clientName}
-                    onChange={(e) => setClientName(e.target.value)}
+                    onChange={(e) => {
+                      autoFilledCustomerNameRef.current = null
+                      setClientName(e.target.value)
+                    }}
                     placeholder="Nombre completo"
                     className="h-12 text-lg"
                     onKeyDown={(e) => onTicketFieldChainKeyDown(e, 2)}
@@ -434,6 +533,65 @@ export default function NuevoTicketPage() {
             </CardContent>
           </Card>
 
+          {/* Quick templates */}
+          {!savedTicket && (
+            <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/[0.035]">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2.5 text-lg">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <Sparkles className="h-5 w-5" />
+                  </span>
+                  Creación rápida
+                </CardTitle>
+                <p className="pl-0 text-sm font-normal leading-relaxed text-muted-foreground sm:pl-[2.875rem]">
+                  Elija un trabajo común para completar equipo, motivo y accesorios. Podrá revisar y
+                  cambiar todo antes de guardar.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div
+                  className="grid gap-2 sm:grid-cols-2"
+                  role="group"
+                  aria-label="Plantillas de tickets comunes"
+                >
+                  {TICKET_QUICK_TEMPLATES.map((template) => {
+                    const isActive = template.id === appliedTemplateId
+                    return (
+                      <Button
+                        key={template.id}
+                        type="button"
+                        variant="outline"
+                        aria-pressed={isActive}
+                        onClick={() => handleApplyTemplate(template)}
+                        className={`h-auto min-h-16 justify-start whitespace-normal rounded-xl px-3 py-3 text-left ${
+                          isActive
+                            ? "border-primary bg-primary/10 text-foreground ring-1 ring-primary/20"
+                            : "border-border/70 bg-card/80"
+                        }`}
+                      >
+                        <span className="min-w-0 space-y-1">
+                          <span className="block font-semibold leading-tight">{template.title}</span>
+                          <span className="block text-xs font-normal leading-tight text-muted-foreground">
+                            {template.detail}
+                          </span>
+                        </span>
+                      </Button>
+                    )
+                  })}
+                </div>
+                <p
+                  className="min-h-5 text-xs text-muted-foreground"
+                  role="status"
+                  aria-live="polite"
+                >
+                  {appliedTemplate
+                    ? `Plantilla aplicada: ${appliedTemplate.title}. El ticket aún no se ha guardado.`
+                    : "Las plantillas no cambian el nombre, teléfono, marca ni modelo."}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Equipment Info */}
           <Card>
             <CardHeader className="pb-4">
@@ -452,7 +610,10 @@ export default function NuevoTicketPage() {
                     value={equipmentType}
                     open={equipmentSelectOpen}
                     onOpenChange={setEquipmentSelectOpen}
-                    onValueChange={(v) => setEquipmentType(v as EquipmentType)}
+                    onValueChange={(v) => {
+                      setEquipmentType(v as EquipmentType)
+                      setAppliedTemplateId(null)
+                    }}
                   >
                     <SelectTrigger
                       ref={kbEquipmentTriggerRef}
@@ -491,10 +652,75 @@ export default function NuevoTicketPage() {
                     id="model"
                     value={model}
                     onChange={(e) => setModel(e.target.value)}
-                    placeholder="Modelo"
+                    placeholder="Escriba o elija un modelo frecuente"
                     className="h-12 text-base"
+                    autoComplete="off"
+                    aria-describedby="modelSuggestionsHelp"
+                    aria-controls="model-suggestions"
                     onKeyDown={(e) => onTicketFieldChainKeyDown(e, 5)}
                   />
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border/70 bg-muted/25 p-3">
+                <div className="flex min-h-5 items-center justify-between gap-3">
+                  <p
+                    id="modelSuggestionsHelp"
+                    className="text-xs font-medium text-muted-foreground"
+                  >
+                    {model.trim()
+                      ? "Coincidencias del historial"
+                      : "Modelos más usados para este tipo de equipo"}
+                  </p>
+                  {modelSuggestionsLoading && (
+                    <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                      Buscando
+                    </span>
+                  )}
+                </div>
+
+                <div id="model-suggestions">
+                  {modelSuggestions.length > 0 ? (
+                    <ul
+                      className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
+                      aria-label="Sugerencias de modelos del historial"
+                    >
+                      {modelSuggestions.map((suggestion) => (
+                        <li key={`${suggestion.brand ?? ""}-${suggestion.model}`}>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => handleModelSuggestion(suggestion)}
+                            className="h-auto min-h-11 w-full min-w-0 justify-start whitespace-normal rounded-lg bg-card px-3 py-2 text-left"
+                            aria-label={`Usar modelo ${suggestion.model}${
+                              suggestion.brand ? `, marca ${suggestion.brand}` : ""
+                            }`}
+                          >
+                            <Database className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                            <span className="min-w-0 leading-tight">
+                              <span className="block truncate font-semibold">{suggestion.model}</span>
+                              <span className="block truncate text-[11px] font-normal text-muted-foreground">
+                                {suggestion.brand ? `${suggestion.brand} · ` : ""}
+                                {suggestion.count}{" "}
+                                {suggestion.count === 1 ? "ticket" : "tickets"}
+                              </span>
+                            </span>
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    !modelSuggestionsLoading && (
+                      <p className="mt-2 text-xs text-muted-foreground" role="status">
+                        {modelSuggestionsError
+                          ? "Las sugerencias no están disponibles; puede escribir el modelo normalmente."
+                          : model.trim()
+                            ? "No hay coincidencias útiles. Puede guardar el modelo tal como lo escribió."
+                            : "Aún no hay modelos útiles registrados para este tipo de equipo."}
+                      </p>
+                    )
+                  )}
                 </div>
               </div>
 
@@ -522,7 +748,10 @@ export default function NuevoTicketPage() {
                   ref={kbProblemRef}
                   id="problemDescription"
                   value={problemDescription}
-                  onChange={(e) => setProblemDescription(e.target.value)}
+                  onChange={(e) => {
+                    setProblemDescription(e.target.value)
+                    setAppliedTemplateId(null)
+                  }}
                   placeholder="Describa el problema del equipo..."
                   className="min-h-24 text-base"
                   onKeyDown={(e) => onTicketFieldChainKeyDown(e, 7)}
