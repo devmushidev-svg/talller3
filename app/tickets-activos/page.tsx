@@ -1,6 +1,12 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+} from "react"
 import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { PageHeader } from "@/components/page-header"
@@ -68,6 +74,31 @@ const statusOptions: TicketStatus[] = [
   "entregado",
 ]
 
+const activeStatusOptions: Exclude<TicketStatus, "entregado">[] = [
+  "recibido",
+  "en_diagnostico",
+  "en_reparacion",
+  "listo",
+]
+
+const ACTIVE_STATUS_VALUES = new Set([
+  ...activeStatusOptions,
+  // Alias historico que todavia puede existir en la base de datos.
+  "received",
+])
+
+function isActiveTicketStatus(status: unknown) {
+  return typeof status === "string" && ACTIVE_STATUS_VALUES.has(status.toLowerCase())
+}
+
+function normalizeTicketStatus(status: unknown): TicketStatus {
+  if (typeof status !== "string") return status as TicketStatus
+  const normalizedStatus = status.toLowerCase()
+  return normalizedStatus === "received"
+    ? "recibido"
+    : (normalizedStatus as TicketStatus)
+}
+
 /** Color por estado (variable CSS, se adapta a claro/oscuro) */
 const STATUS_VAR: Record<TicketStatus, string> = {
   recibido: "var(--chart-1)",
@@ -93,6 +124,212 @@ function StatusPill({ status }: { status: TicketStatus }) {
   )
 }
 
+interface ScrollSafeTableRowProps {
+  children: ReactNode
+  label: string
+  onActivate: () => void
+}
+
+/** Evita activar una fila si el puntero se usó para desplazar la tabla. */
+function ScrollSafeTableRow({ children, label, onActivate }: ScrollSafeTableRowProps) {
+  const pointerOriginRef = useRef<{
+    pointerId: number
+    x: number
+    y: number
+  } | null>(null)
+  const draggedRef = useRef(false)
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLTableRowElement>) => {
+    if (!event.isPrimary || event.button !== 0) return
+    pointerOriginRef.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+    }
+    draggedRef.current = false
+  }
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLTableRowElement>) => {
+    const origin = pointerOriginRef.current
+    if (!origin || origin.pointerId !== event.pointerId || draggedRef.current) return
+
+    if (
+      Math.abs(event.clientX - origin.x) > 8 ||
+      Math.abs(event.clientY - origin.y) > 8
+    ) {
+      draggedRef.current = true
+    }
+  }
+
+  const handlePointerCancel = (event: ReactPointerEvent<HTMLTableRowElement>) => {
+    if (pointerOriginRef.current?.pointerId === event.pointerId) {
+      draggedRef.current = true
+    }
+  }
+
+  const handleClick = (event: ReactMouseEvent<HTMLTableRowElement>) => {
+    pointerOriginRef.current = null
+    onActivate()
+  }
+
+  // Se ejecuta antes que el click del Select o de los botones de la celda.
+  // Asi, un gesto usado para desplazar la tabla no activa ningun control.
+  const handleClickCapture = (event: ReactMouseEvent<HTMLTableRowElement>) => {
+    pointerOriginRef.current = null
+    if (event.detail === 0) {
+      draggedRef.current = false
+      return
+    }
+    if (!draggedRef.current) return
+
+    draggedRef.current = false
+    event.preventDefault()
+    event.stopPropagation()
+  }
+
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLTableRowElement>) => {
+    if (event.target !== event.currentTarget) return
+    if (event.key !== "Enter" && event.key !== " ") return
+    event.preventDefault()
+    onActivate()
+  }
+
+  return (
+    <TableRow
+      tabIndex={0}
+      aria-label={label}
+      className="cursor-pointer transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      onPointerDownCapture={handlePointerDown}
+      onPointerMoveCapture={handlePointerMove}
+      onPointerCancelCapture={handlePointerCancel}
+      onClickCapture={handleClickCapture}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+    >
+      {children}
+    </TableRow>
+  )
+}
+
+interface ActiveTicketMobileCardProps {
+  ticket: Ticket
+  ticketNumber: string
+  formattedDate: string
+  onOpen: (ticket: Ticket) => void
+  onStatusChange: (ticketId: string, status: TicketStatus) => void
+  isStatusSaving: boolean
+  onCustomerPrint: (ticket: Ticket) => void
+  onInternalPrint: (ticket: Ticket) => void
+}
+
+function ActiveTicketMobileCard({
+  ticket,
+  ticketNumber,
+  formattedDate,
+  onOpen,
+  onStatusChange,
+  isStatusSaving,
+  onCustomerPrint,
+  onInternalPrint,
+}: ActiveTicketMobileCardProps) {
+  const equipment = EQUIPMENT_LABELS[ticket.equipment_type] ?? ticket.equipment_type
+  const brandModel = [ticket.brand, ticket.model].filter(Boolean).join(" ")
+
+  return (
+    <article>
+      <Card className="overflow-hidden border-border/70 shadow-sm">
+        <CardContent className="space-y-4 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 space-y-1">
+              <p className="font-mono text-xs font-bold text-primary">{ticketNumber}</p>
+              <h3 className="truncate text-base font-semibold">{ticket.client_name}</h3>
+              <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <Smartphone className="size-3.5 shrink-0" />
+                <span className="truncate">{ticket.client_phone || "Sin teléfono"}</span>
+              </p>
+            </div>
+            <StatusPill status={ticket.status} />
+          </div>
+
+          <div className="flex flex-wrap gap-2 text-xs">
+            <Badge variant="secondary" className="font-normal">{equipment}</Badge>
+            {brandModel && (
+              <span className="rounded-full border border-border/70 px-2.5 py-1 text-muted-foreground">
+                {brandModel}
+              </span>
+            )}
+          </div>
+
+          {ticket.problem_description && (
+            <p className="line-clamp-2 text-sm leading-relaxed text-foreground/80">
+              {ticket.problem_description}
+            </p>
+          )}
+
+          <div className="flex items-center justify-between gap-3 border-t border-border/70 pt-3 text-xs text-muted-foreground">
+            <span>{formattedDate}</span>
+            {ticket.total_cost != null && ticket.total_cost > 0 && (
+              <span className="font-semibold tabular-nums text-success">
+                L. {ticket.total_cost.toFixed(2)}
+              </span>
+            )}
+          </div>
+
+          <Select
+            value={ticket.status}
+            disabled={isStatusSaving}
+            onValueChange={(value) => onStatusChange(ticket.id, value as TicketStatus)}
+          >
+            <SelectTrigger
+              className="h-11 w-full bg-card"
+              aria-label={`Cambiar estado de ${ticketNumber}`}
+              aria-busy={isStatusSaving}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {statusOptions.map((status) => (
+                <SelectItem key={status} value={status}>
+                  <StatusPill status={status} />
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="flex items-center gap-2">
+            <Button type="button" size="lg" className="h-11 flex-1" onClick={() => onOpen(ticket)}>
+              <Eye className="size-4" />
+              Ver detalles
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-lg"
+              className="size-11"
+              aria-label={`Imprimir comprobante de ${ticketNumber}`}
+              title="Imprimir comprobante"
+              onClick={() => onCustomerPrint(ticket)}
+            >
+              <Printer className="size-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-lg"
+              className="size-11"
+              aria-label={`Imprimir etiquetas de ${ticketNumber}`}
+              title="Imprimir etiquetas"
+              onClick={() => onInternalPrint(ticket)}
+            >
+              <Tag className="size-4" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </article>
+  )
+}
+
 export default function TicketsActivosPage() {
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
@@ -103,6 +340,10 @@ export default function TicketsActivosPage() {
   const [showInternalPrint, setShowInternalPrint] = useState(false)
   const [loading, setLoading] = useState(true)
   const [showFilters, setShowFilters] = useState(false)
+  const [savingStatusIds, setSavingStatusIds] = useState<Set<string>>(
+    () => new Set()
+  )
+  const ticketsRequestIdRef = useRef(0)
 
   // Advanced filters
   const [statusFilter, setStatusFilter] = useState<string>("all")
@@ -123,6 +364,7 @@ export default function TicketsActivosPage() {
 
   const parseTicket = (t: Ticket): Ticket => ({
     ...t,
+    status: normalizeTicketStatus(t.status),
     accessories:
       typeof t.accessories === "string"
         ? JSON.parse(t.accessories as string)
@@ -133,68 +375,140 @@ export default function TicketsActivosPage() {
         : t.photos || [],
   })
 
-  const fetchTickets = async () => {
-    try {
-      const params = new URLSearchParams()
-      if (searchTerm) params.set('q', searchTerm)
-      if (statusFilter !== 'all') params.set('status', statusFilter)
-      if (equipmentFilter !== 'all') params.set('equipment_type', equipmentFilter)
-      if (dateFrom) params.set('date_from', dateFrom)
-      if (dateTo) params.set('date_to', dateTo)
-
-      const url = params.toString() ? `/api/search?${params}` : '/api/tickets'
-      const response = await fetch(url)
-      const data = await response.json()
-
-      const parsedTickets = (Array.isArray(data) ? data : [])
-        .map((t: Ticket) => parseTicket(t))
-        .filter((t: Ticket) => statusFilter === 'all' ? t.status !== "entregado" : true)
-
-      setTickets(parsedTickets)
-    } catch (error) {
-      console.error("Error fetching tickets:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   useEffect(() => {
-    const debounce = setTimeout(() => {
+    const requestId = ++ticketsRequestIdRef.current
+    const controller = new AbortController()
+
+    const debounce = setTimeout(async () => {
       setLoading(true)
-      fetchTickets()
+
+      try {
+        const params = new URLSearchParams()
+        const hasSearchFilters = Boolean(
+          searchTerm ||
+            statusFilter !== "all" ||
+            equipmentFilter !== "all" ||
+            dateFrom ||
+            dateTo
+        )
+        if (hasSearchFilters) params.set("scope", "active")
+        if (searchTerm) params.set("q", searchTerm)
+        // Se filtra en cliente para que "recibido" incluya el alias "received".
+        if (statusFilter !== "all" && statusFilter !== "recibido") {
+          params.set("status", statusFilter)
+        }
+        if (equipmentFilter !== "all") {
+          params.set("equipment_type", equipmentFilter)
+        }
+        if (dateFrom) params.set("date_from", dateFrom)
+        if (dateTo) params.set("date_to", dateTo)
+
+        const url = hasSearchFilters
+          ? `/api/search?${params}`
+          : "/api/tickets?scope=active"
+        const response = await fetch(url, { signal: controller.signal })
+        if (!response.ok) {
+          throw new Error(`No se pudieron cargar los tickets (${response.status})`)
+        }
+
+        const data: unknown = await response.json()
+        if (requestId !== ticketsRequestIdRef.current) return
+
+        const parsedTickets = (Array.isArray(data) ? data : [])
+          .filter((ticket): ticket is Ticket =>
+            isActiveTicketStatus((ticket as { status?: unknown })?.status)
+          )
+          .map((ticket) => parseTicket(ticket))
+          .filter(
+            (ticket) =>
+              statusFilter === "all" || ticket.status === statusFilter
+          )
+
+        setTickets(parsedTickets)
+      } catch (error) {
+        if (controller.signal.aborted || requestId !== ticketsRequestIdRef.current) {
+          return
+        }
+        console.error("Error fetching tickets:", error)
+      } finally {
+        if (requestId === ticketsRequestIdRef.current) {
+          setLoading(false)
+        }
+      }
     }, 300)
-    return () => clearTimeout(debounce)
+
+    return () => {
+      clearTimeout(debounce)
+      controller.abort()
+    }
   }, [searchTerm, statusFilter, equipmentFilter, dateFrom, dateTo])
 
   const handleStatusChange = async (ticketId: string, newStatus: TicketStatus) => {
+    if (savingStatusIds.has(ticketId)) return
+
+    setSavingStatusIds((previous) => {
+      const next = new Set(previous)
+      next.add(ticketId)
+      return next
+    })
+
     try {
       const updateData: Record<string, unknown> = { status: newStatus }
       if (newStatus === 'entregado') {
         updateData.delivered_at = new Date().toISOString()
       }
 
-      await fetch(`/api/tickets/${ticketId}`, {
+      const response = await fetch(`/api/tickets/${ticketId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updateData),
       })
 
-      setTickets((prev) =>
-        prev.map((t) => (t.id === ticketId ? { ...t, status: newStatus } : t))
-      )
-
-      if (selectedTicket?.id === ticketId) {
-        setSelectedTicket((prev) =>
-          prev ? { ...prev, status: newStatus } : null
-        )
+      if (!response.ok) {
+        let message = "No se pudo cambiar el estado del ticket"
+        try {
+          const body = (await response.json()) as { error?: unknown }
+          if (typeof body.error === "string" && body.error.trim()) {
+            message = body.error
+          }
+        } catch {
+          // La respuesta puede no incluir JSON; conservamos el mensaje amigable.
+        }
+        throw new Error(message)
       }
 
-      if (newStatus === "entregado" && statusFilter === 'all') {
-        setTickets((prev) => prev.filter((t) => t.id !== ticketId))
-        setSelectedTicket(null)
+      setTickets((prev) => {
+        if (
+          !isActiveTicketStatus(newStatus) ||
+          (statusFilter !== "all" && statusFilter !== newStatus)
+        ) {
+          return prev.filter((ticket) => ticket.id !== ticketId)
+        }
+
+        return prev.map((ticket) =>
+          ticket.id === ticketId ? { ...ticket, status: newStatus } : ticket
+        )
+      })
+
+      if (selectedTicket?.id === ticketId) {
+        setSelectedTicket((prev) => {
+          if (!prev || !isActiveTicketStatus(newStatus)) return null
+          return { ...prev, status: newStatus }
+        })
       }
     } catch (error) {
       console.error("Error updating status:", error)
+      alert(
+        error instanceof Error
+          ? error.message
+          : "No se pudo cambiar el estado del ticket"
+      )
+    } finally {
+      setSavingStatusIds((previous) => {
+        const next = new Set(previous)
+        next.delete(ticketId)
+        return next
+      })
     }
   }
 
@@ -251,7 +565,7 @@ export default function TicketsActivosPage() {
         }),
       })
 
-      const updatedTicket = {
+      const updatedTicket: Ticket = {
         ...selectedTicket,
         diagnosis: editDiagnosis,
         repair_notes: editRepairNotes,
@@ -350,7 +664,7 @@ export default function TicketsActivosPage() {
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    placeholder="Cliente, N° ticket (ej. 4), ID, teléfono, marca..."
+                    placeholder="Cliente, N° ticket, teléfono o modelo"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="h-11 pl-10"
@@ -382,7 +696,7 @@ export default function TicketsActivosPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos los activos</SelectItem>
-                        {statusOptions.map(status => (
+                        {activeStatusOptions.map(status => (
                           <SelectItem key={status} value={status}>
                             {STATUS_LABELS[status]}
                           </SelectItem>
@@ -489,10 +803,29 @@ export default function TicketsActivosPage() {
               )}
             </div>
           ) : (
-            <Card className="overflow-hidden">
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <Table>
+            <>
+              <div className="grid gap-3 md:hidden">
+                {tickets.map((ticket) => (
+                  <ActiveTicketMobileCard
+                    key={ticket.id}
+                    ticket={ticket}
+                    ticketNumber={displayId(ticket)}
+                    formattedDate={formatDate(ticket.created_at)}
+                    onOpen={openTicketDetail}
+                    onStatusChange={(ticketId, status) => {
+                      void handleStatusChange(ticketId, status)
+                    }}
+                    isStatusSaving={savingStatusIds.has(ticket.id)}
+                    onCustomerPrint={handleCustomerPrint}
+                    onInternalPrint={handleInternalPrint}
+                  />
+                ))}
+              </div>
+
+              <Card className="hidden overflow-hidden md:block">
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <Table>
                     <TableHeader>
                       <TableRow className="hover:bg-transparent">
                         <TableHead className="w-28">Ticket</TableHead>
@@ -507,10 +840,10 @@ export default function TicketsActivosPage() {
                     </TableHeader>
                     <TableBody>
                       {tickets.map((ticket) => (
-                        <TableRow
+                        <ScrollSafeTableRow
                           key={ticket.id}
-                          className="cursor-pointer transition-colors hover:bg-muted/50"
-                          onClick={() => openTicketDetail(ticket)}
+                          label={`Abrir ${displayId(ticket)} de ${ticket.client_name}`}
+                          onActivate={() => openTicketDetail(ticket)}
                         >
                           <TableCell className="font-mono text-xs font-semibold text-primary">
                             {displayId(ticket)}
@@ -535,11 +868,15 @@ export default function TicketsActivosPage() {
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             <Select
                               value={ticket.status}
+                              disabled={savingStatusIds.has(ticket.id)}
                               onValueChange={(value) =>
                                 handleStatusChange(ticket.id, value as TicketStatus)
                               }
                             >
-                              <SelectTrigger className="h-9 w-[150px] border-border/70">
+                              <SelectTrigger
+                                className="h-9 w-[150px] border-border/70"
+                                aria-busy={savingStatusIds.has(ticket.id)}
+                              >
                                 <StatusPill status={ticket.status} />
                               </SelectTrigger>
                               <SelectContent>
@@ -591,13 +928,14 @@ export default function TicketsActivosPage() {
                               </Button>
                             </div>
                           </TableCell>
-                        </TableRow>
+                        </ScrollSafeTableRow>
                       ))}
                     </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
           )}
         </section>
       </div>
@@ -887,11 +1225,15 @@ export default function TicketsActivosPage() {
                     <Label>Cambiar estado</Label>
                     <Select
                       value={selectedTicket.status}
+                      disabled={savingStatusIds.has(selectedTicket.id)}
                       onValueChange={(value) =>
                         handleStatusChange(selectedTicket.id, value as TicketStatus)
                       }
                     >
-                      <SelectTrigger className="w-full sm:w-56">
+                      <SelectTrigger
+                        className="w-full sm:w-56"
+                        aria-busy={savingStatusIds.has(selectedTicket.id)}
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>

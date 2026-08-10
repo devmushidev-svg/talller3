@@ -35,6 +35,8 @@ import {
 import { cn } from "@/lib/utils"
 import { formatDateOnlyForDisplay } from "@/lib/date-utils"
 import { PhoneActions } from "@/components/phone-actions"
+import { ScrollSafeLink } from "@/components/scroll-safe-link"
+import { GlobalTicketSearch } from "@/components/global-ticket-search"
 import { buildTicketWhatsAppTemplates } from "@/lib/whatsapp"
 
 function parseTicket(t: Ticket): Ticket {
@@ -88,7 +90,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     let cancelled = false
-    fetch("/api/tickets")
+    fetch("/api/tickets?scope=active&limit=8")
       .then((res) => res.json())
       .then((data) => {
         if (cancelled) return
@@ -137,6 +139,17 @@ export default function DashboardPage() {
         if (newStatus === "entregado") return prev.filter((t) => t.id !== ticketId)
         return prev.map((t) => (t.id === ticketId ? { ...t, status: newStatus } : t))
       })
+      if (newStatus === "entregado") {
+        setStats((previous) =>
+          previous
+            ? {
+                ...previous,
+                activeTickets: Math.max(previous.activeTickets - 1, 0),
+                deliveredToday: previous.deliveredToday + 1,
+              }
+            : previous
+        )
+      }
     } catch (e) {
       console.error(e)
       alert("No se pudo cambiar el estado")
@@ -180,6 +193,10 @@ export default function DashboardPage() {
   const accList = (t: Ticket) =>
     Array.isArray(t.accessories) ? t.accessories.filter(Boolean) : []
 
+  // La API ya entrega los tickets del más reciente al más antiguo.
+  const recentTickets = tickets.slice(0, 8)
+  const activeTicketCount = stats?.activeTickets ?? null
+
   return (
     <DashboardLayout>
       <div className="space-y-8">
@@ -196,6 +213,8 @@ export default function DashboardPage() {
             </Button>
           }
         />
+
+        <GlobalTicketSearch />
 
         {/* ── Estadísticas ───────────────────────────── */}
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 stagger">
@@ -275,18 +294,25 @@ export default function DashboardPage() {
             <h2 className="flex items-center gap-2 text-lg font-semibold">
               <ClipboardList className="h-5 w-5 text-primary" />
               En taller
-              {!ticketsLoading && (
+              {activeTicketCount !== null && (
                 <Badge variant="secondary" className="font-normal">
-                  {tickets.length} activo{tickets.length !== 1 ? "s" : ""}
+                  {activeTicketCount} activo{activeTicketCount !== 1 ? "s" : ""}
                 </Badge>
               )}
             </h2>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/tickets-activos">
-                Lista completa y filtros
-                <ArrowRight className="ml-1.5 h-4 w-4" />
-              </Link>
-            </Button>
+            <div className="flex items-center gap-3">
+              {activeTicketCount !== null && activeTicketCount > recentTickets.length && (
+                <span className="hidden text-xs text-muted-foreground sm:inline">
+                  Mostrando los {recentTickets.length} más recientes
+                </span>
+              )}
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/tickets-activos">
+                  Lista completa y filtros
+                  <ArrowRight className="ml-1.5 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
           </div>
 
           {ticketsLoading ? (
@@ -323,7 +349,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 stagger">
-              {tickets.map((ticket) => {
+              {recentTickets.map((ticket) => {
                 const color = STATUS_VAR[ticket.status]
                 const waTemplates = buildTicketWhatsAppTemplates(ticket)
                 return (
@@ -338,9 +364,9 @@ export default function DashboardPage() {
                       aria-hidden
                     />
 
-                    <Link
+                    <ScrollSafeLink
                       href={`/tickets-activos?ticketId=${encodeURIComponent(ticket.id)}`}
-                      className="block flex-1 space-y-3 p-5 pl-6 outline-none focus-visible:bg-muted/40"
+                      className="block flex-1 touch-pan-y space-y-3 p-5 pl-6 outline-none active:bg-muted/30 focus-visible:bg-muted/40"
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-sm font-bold text-primary">
@@ -374,7 +400,7 @@ export default function DashboardPage() {
                           <span>· {accList(ticket).length} accesorio{accList(ticket).length !== 1 ? "s" : ""}</span>
                         )}
                       </div>
-                    </Link>
+                    </ScrollSafeLink>
 
                     {/* Pie: contacto + cambio rápido de estado */}
                     <div className="space-y-2.5 border-t border-border/70 bg-muted/30 px-5 py-3 pl-6">
