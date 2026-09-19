@@ -51,6 +51,7 @@ import {
   TICKET_QUICK_TEMPLATES,
   type TicketQuickTemplate,
 } from "./ticket-templates"
+import { toast } from "sonner"
 
 interface ModelSuggestion {
   model: string
@@ -336,7 +337,7 @@ export default function NuevoTicketPage() {
 
   const handleSave = async (openPrintDialog: boolean = false) => {
     if (!clientName || !clientPhone || !problemDescription) {
-      alert("Por favor complete los campos obligatorios: Teléfono, Nombre y Problema")
+      toast.error("Por favor complete los campos obligatorios: Teléfono, Nombre y Problema")
       return
     }
 
@@ -414,11 +415,11 @@ export default function NuevoTicketPage() {
           accessoryLabelsRef.current?.print() // no-op si no hay accesorios
         })()
       } else {
-        alert(`Ticket ${ticket.id} creado correctamente`)
+        toast.success(`Ticket ${ticket.id} creado correctamente`)
         resetForm()
       }
     } catch (error) {
-      alert("Error al guardar el ticket")
+      toast.error("Error al guardar el ticket")
       console.error(error)
     } finally {
       setSaving(false)

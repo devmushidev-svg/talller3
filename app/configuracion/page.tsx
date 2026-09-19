@@ -29,6 +29,7 @@ import {
   Phone,
   MapPin,
 } from "lucide-react"
+import { toast } from "sonner"
 
 export default function ConfiguracionPage() {
   const [shopName, setShopName] = useState("Mi Taller")
@@ -70,10 +71,10 @@ export default function ConfiguracionPage() {
           printer_width: printerWidth,
         }),
       })
-      alert("Configuración guardada correctamente")
+      toast.success("Configuración guardada correctamente")
     } catch (error) {
       console.error("Error saving settings:", error)
-      alert("Error al guardar la configuración")
+      toast.error("Error al guardar la configuración")
     } finally {
       setSaving(false)
     }

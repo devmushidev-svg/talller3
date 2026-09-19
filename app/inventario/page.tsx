@@ -52,6 +52,9 @@ import {
   Layers,
   Ruler,
 } from "lucide-react"
+import { toast } from "sonner"
+import { fetchLista, mensajeDeError } from "@/lib/fetch-lista"
+import { EstadoError } from "@/components/estado-lista"
 
 interface PartFormData {
   name: string
@@ -91,14 +94,17 @@ export default function InventarioPage() {
   const [formData, setFormData] = useState<PartFormData>(emptyPart)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const fetchParts = async () => {
+    setLoading(true)
+    setLoadError(null)
     try {
-      const response = await fetch("/api/parts")
-      const data = await response.json()
-      setParts(data)
+      setParts(await fetchLista<Part>("/api/parts"))
     } catch (error) {
       console.error("Error fetching parts:", error)
+      setLoadError(mensajeDeError(error))
+      setParts([])
     } finally {
       setLoading(false)
     }
@@ -141,7 +147,7 @@ export default function InventarioPage() {
 
   const handleSave = async () => {
     if (!formData.name || !formData.category) {
-      alert("Por favor complete los campos obligatorios")
+      toast.error("Por favor complete los campos obligatorios")
       return
     }
 
@@ -319,6 +325,8 @@ export default function InventarioPage() {
               </div>
             ))}
           </div>
+        ) : loadError ? (
+          <EstadoError mensaje={loadError} onReintentar={fetchParts} />
         ) : filteredParts.length === 0 ? (
           <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-card py-16 text-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">

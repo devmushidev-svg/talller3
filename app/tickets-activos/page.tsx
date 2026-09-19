@@ -66,6 +66,7 @@ import { PhoneActions } from "@/components/phone-actions"
 import { buildTicketWhatsAppTemplates } from "@/lib/whatsapp"
 import { formatDateOnlyForDisplay } from "@/lib/date-utils"
 import { StatusPill, statusBase } from "@/components/status-pill"
+import { toast } from "sonner"
 
 const statusOptions: TicketStatus[] = [
   "recibido",
@@ -475,7 +476,7 @@ export default function TicketsActivosPage() {
       }
     } catch (error) {
       console.error("Error updating status:", error)
-      alert(
+      toast.error(
         error instanceof Error
           ? error.message
           : "No se pudo cambiar el estado del ticket"
@@ -494,7 +495,7 @@ export default function TicketsActivosPage() {
     const name = editClientName.trim()
     const phone = editClientPhone.trim()
     if (!name || !phone) {
-      alert("Nombre y teléfono son obligatorios")
+      toast.error("Nombre y teléfono son obligatorios")
       return
     }
     setSavingClient(true)
@@ -513,7 +514,7 @@ export default function TicketsActivosPage() {
       )
     } catch (e) {
       console.error(e)
-      alert("No se pudo guardar los datos del cliente")
+      toast.error("No se pudo guardar los datos del cliente")
     } finally {
       setSavingClient(false)
     }

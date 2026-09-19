@@ -39,6 +39,7 @@ import { PhoneActions } from "@/components/phone-actions"
 import { ScrollSafeLink } from "@/components/scroll-safe-link"
 import { GlobalTicketSearch } from "@/components/global-ticket-search"
 import { buildTicketWhatsAppTemplates } from "@/lib/whatsapp"
+import { toast } from "sonner"
 
 function parseTicket(t: Ticket): Ticket {
   return {
@@ -145,7 +146,7 @@ export default function DashboardPage() {
       }
     } catch (e) {
       console.error(e)
-      alert("No se pudo cambiar el estado")
+      toast.error("No se pudo cambiar el estado")
     } finally {
       setStatusSavingId(null)
     }

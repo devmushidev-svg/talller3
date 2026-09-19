@@ -35,6 +35,8 @@ import { formatDateOnlyForDisplay } from "@/lib/date-utils"
 import { PhoneActions } from "@/components/phone-actions"
 import { buildTicketWhatsAppTemplates } from "@/lib/whatsapp"
 import { StatusPill } from "@/components/status-pill"
+import { fetchLista, mensajeDeError } from "@/lib/fetch-lista"
+import { EstadoError } from "@/components/estado-lista"
 
 /** Color del estado "entregado" (variable CSS, se adapta a claro/oscuro) */
 const DELIVERED_COLOR = "var(--st-entregado)"
@@ -44,12 +46,13 @@ export default function HistorialPage() {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
-  useEffect(() => {
-    const fetchTickets = async () => {
+  const fetchTickets = async () => {
+      setLoading(true)
+      setLoadError(null)
       try {
-        const response = await fetch("/api/tickets")
-        const data = await response.json()
+        const data = await fetchLista<Ticket>("/api/tickets")
 
         // Parse accessories and filter completed tickets
         const completedTickets = data
@@ -64,11 +67,14 @@ export default function HistorialPage() {
         setTickets(completedTickets)
       } catch (error) {
         console.error("Error fetching tickets:", error)
+        setLoadError(mensajeDeError(error))
+        setTickets([])
       } finally {
         setLoading(false)
       }
     }
 
+  useEffect(() => {
     fetchTickets()
   }, [])
 
@@ -171,6 +177,16 @@ export default function HistorialPage() {
                       </TableCell>
                     </TableRow>
                   ))
+                ) : loadError ? (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={7} className="p-0">
+                      <EstadoError
+                        mensaje={loadError}
+                        onReintentar={fetchTickets}
+                        className="border-0 bg-transparent"
+                      />
+                    </TableCell>
+                  </TableRow>
                 ) : filteredTickets.length === 0 ? (
                   <TableRow className="hover:bg-transparent">
                     <TableCell colSpan={7} className="p-0">
