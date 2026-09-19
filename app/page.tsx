@@ -434,6 +434,8 @@ export default function DashboardPage() {
                           phone={ticket.client_phone}
                           templates={waTemplates}
                           size="sm"
+                          preguntarMarcarListo={ticket.status !== "listo"}
+                          marcarListo={() => handleStatusChange(ticket.id, "listo")}
                         />
                       </div>
                       <div className="flex items-center gap-2">
