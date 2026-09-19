@@ -24,10 +24,10 @@ const buttonVariants = cva(
       // la densidad, asi que el tamano por defecto llega a 44px.
       size: {
         default: 'h-11 px-4 py-2 has-[>svg]:px-3.5',
-        sm: 'h-10 gap-1.5 px-3 has-[>svg]:px-2.5',
+        sm: 'h-11 gap-1.5 px-3 text-[13px] has-[>svg]:px-2.5',
         lg: 'h-12 px-6 text-[15px] has-[>svg]:px-5',
         icon: 'size-11',
-        'icon-sm': 'size-10',
+        'icon-sm': 'size-11',
         'icon-lg': 'size-12',
       },
     },
