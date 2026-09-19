@@ -37,7 +37,8 @@ import { cn } from "@/lib/utils"
 import { StatusPill, statusBase } from "@/components/status-pill"
 import { formatDateOnlyForDisplay } from "@/lib/date-utils"
 import { PhoneActions } from "@/components/phone-actions"
-import { ScrollSafeLink } from "@/components/scroll-safe-link"
+import { ScrollSafeButton } from "@/components/scroll-safe-link"
+import { TicketResumenDialog } from "@/components/ticket-resumen-dialog"
 import { GlobalTicketSearch } from "@/components/global-ticket-search"
 import { buildTicketWhatsAppTemplates } from "@/lib/whatsapp"
 import { toast } from "sonner"
@@ -87,6 +88,7 @@ export default function DashboardPage() {
   const [ticketsError, setTicketsError] = useState<string | null>(null)
   const [statsError, setStatsError] = useState<string | null>(null)
   const [reintento, setReintento] = useState(0)
+  const [ticketAbierto, setTicketAbierto] = useState<Ticket | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -156,6 +158,15 @@ export default function DashboardPage() {
         if (newStatus === "entregado") return prev.filter((t) => t.id !== ticketId)
         return prev.map((t) => (t.id === ticketId ? { ...t, status: newStatus } : t))
       })
+      // Entregado sale de la lista, asi que la ventana se cierra sola; en el
+      // resto se actualiza para que la pildora no quede mostrando lo viejo.
+      setTicketAbierto((abierto) =>
+        abierto?.id !== ticketId
+          ? abierto
+          : newStatus === "entregado"
+            ? null
+            : { ...abierto, status: newStatus }
+      )
       if (newStatus === "entregado") {
         setStats((previous) =>
           previous
@@ -393,9 +404,12 @@ export default function DashboardPage() {
                       aria-hidden
                     />
 
-                    <ScrollSafeLink
-                      href={`/tickets-activos?ticketId=${encodeURIComponent(ticket.id)}`}
-                      className="block flex-1 touch-pan-y space-y-3 p-5 pl-6 outline-none active:bg-muted/30 focus-visible:bg-muted/40"
+                    {/* Abre el resumen en una ventana. Antes navegaba a otra
+                        pantalla y cortaba lo que se estaba haciendo. */}
+                    <ScrollSafeButton
+                      onClick={() => setTicketAbierto(ticket)}
+                      aria-label={`Ver ticket ${displayId(ticket)} de ${ticket.client_name}`}
+                      className="block w-full flex-1 touch-pan-y space-y-3 p-5 pl-6 text-left outline-none active:bg-muted/30 focus-visible:bg-muted/40"
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-sm font-bold text-primary">
@@ -421,7 +435,7 @@ export default function DashboardPage() {
                           <span>· {accList(ticket).length} accesorio{accList(ticket).length !== 1 ? "s" : ""}</span>
                         )}
                       </div>
-                    </ScrollSafeLink>
+                    </ScrollSafeButton>
 
                     {/* Pie: contacto + cambio rápido de estado */}
                     <div className="space-y-2.5 border-t border-border bg-muted/30 px-5 py-3 pl-6">
@@ -469,6 +483,14 @@ export default function DashboardPage() {
           )}
         </section>
       </div>
+
+      <TicketResumenDialog
+        ticket={ticketAbierto}
+        abierto={ticketAbierto !== null}
+        onAbiertoChange={(a) => !a && setTicketAbierto(null)}
+        onCambiarEstado={handleStatusChange}
+        guardandoEstado={statusSavingId === ticketAbierto?.id}
+      />
     </DashboardLayout>
   )
 }
