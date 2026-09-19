@@ -33,6 +33,7 @@ import {
   EQUIPMENT_LABELS,
 } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { StatusPill, statusBase } from "@/components/status-pill"
 import { formatDateOnlyForDisplay } from "@/lib/date-utils"
 import { PhoneActions } from "@/components/phone-actions"
 import { ScrollSafeLink } from "@/components/scroll-safe-link"
@@ -59,14 +60,6 @@ const statusFlow: TicketStatus[] = [
   "entregado",
 ]
 
-/** Color por estado (variable CSS, se adapta a claro/oscuro) */
-const STATUS_VAR: Record<TicketStatus, string> = {
-  recibido: "var(--chart-1)",
-  en_diagnostico: "var(--warning)",
-  en_reparacion: "var(--chart-2)",
-  listo: "var(--success)",
-  entregado: "var(--muted-foreground)",
-}
 
 interface Stats {
   receivedToday: number
@@ -158,31 +151,29 @@ export default function DashboardPage() {
     }
   }
 
-  const statCards = [
-    {
-      title: "Recibidos hoy",
-      value: stats?.receivedToday,
-      icon: Package,
-      tint: "var(--chart-1)",
-    },
-    {
-      title: "Activos",
-      value: stats?.activeTickets,
-      icon: ClipboardList,
-      tint: "var(--warning)",
-    },
+  /**
+   * Quien abre el inicio pregunta una sola cosa: que tengo que entregar y
+   * cuanto trabajo hay adentro. Esos dos numeros van grandes. Todo lo demas
+   * es contexto y va chico, en una linea.
+   */
+  const principales = [
     {
       title: "Listos para entrega",
       value: stats?.readyForPickup,
-      icon: CheckCircle,
-      tint: "var(--success)",
+      hint: "esperando que el cliente pase",
+      href: "/tickets-activos?status=listo",
     },
     {
-      title: "Entregados hoy",
-      value: stats?.deliveredToday,
-      icon: Truck,
-      tint: "var(--chart-2)",
+      title: "En taller",
+      value: stats?.activeTickets,
+      hint: "equipos sin entregar",
+      href: "/tickets-activos",
     },
+  ]
+
+  const hoy = [
+    { title: "Recibidos hoy", value: stats?.receivedToday },
+    { title: "Entregados hoy", value: stats?.deliveredToday },
   ]
 
   const displayId = (t: Ticket) =>
@@ -201,7 +192,6 @@ export default function DashboardPage() {
     <DashboardLayout>
       <div className="space-y-8">
         <PageHeader
-          icon={LayoutDashboard}
           title="Inicio"
           description="Resumen del taller y tickets activos."
           action={
@@ -216,77 +206,56 @@ export default function DashboardPage() {
 
         <GlobalTicketSearch />
 
-        {/* ── Estadísticas ───────────────────────────── */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 stagger">
-          {statCards.map((c) => (
-            <div
+        {/* ── Lo que hay que hacer ahora ─────────────── */}
+        <div className="grid gap-3 sm:grid-cols-2">
+          {principales.map((c) => (
+            <Link
               key={c.title}
-              className="hover-lift relative overflow-hidden rounded-2xl border border-border/70 bg-card p-4 sm:p-5"
+              href={c.href}
+              className="group rounded-2xl border border-border bg-card p-5 transition-colors hover:border-input"
             >
-              <div
-                className="absolute -right-6 -top-6 h-20 w-20 rounded-full opacity-[0.12]"
-                style={{ background: c.tint }}
-                aria-hidden
-              />
-              <div className="flex items-center gap-3">
-                <span
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
-                  style={{
-                    backgroundColor: `color-mix(in oklch, ${c.tint} 15%, transparent)`,
-                    color: c.tint,
-                  }}
-                >
-                  <c.icon className="h-5 w-5" />
-                </span>
-                <div className="min-w-0">
-                  {c.value == null ? (
-                    <div className="h-7 w-10 rounded-md shimmer" />
-                  ) : (
-                    <p className="text-2xl font-bold leading-none tabular-nums">
-                      {c.value}
-                    </p>
-                  )}
-                  <p className="mt-1 truncate text-xs text-muted-foreground">
-                    {c.title}
-                  </p>
-                </div>
-              </div>
-            </div>
+              <p className="text-sm text-muted-foreground">{c.title}</p>
+              {c.value == null ? (
+                <div className="mt-2 h-10 w-16 rounded-md shimmer" />
+              ) : (
+                <p className="mt-1 text-4xl font-semibold leading-none tabular">
+                  {c.value}
+                </p>
+              )}
+              <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                {c.hint}
+                <ArrowRight className="size-3 opacity-0 transition-opacity group-hover:opacity-100" />
+              </p>
+            </Link>
           ))}
         </div>
 
-        {/* Métricas secundarias */}
-        {stats && (
-          <div className="grid gap-3 sm:grid-cols-3 stagger">
-            <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card p-4">
-              <CalendarClock className="h-5 w-5 shrink-0 text-primary" />
-              <div className="text-sm">
-                <p className="font-semibold">Esta semana</p>
-                <p className="text-muted-foreground">
-                  {stats.weekTickets} tickets · L. {stats.weekRevenue.toFixed(2)}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card p-4">
-              <Truck className="h-5 w-5 shrink-0 text-chart-2" />
-              <div className="text-sm">
-                <p className="font-semibold">Este mes</p>
-                <p className="text-muted-foreground">
-                  {stats.monthDelivered} entregados · L. {stats.monthRevenue.toFixed(2)}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card p-4">
-              <Wallet className="h-5 w-5 shrink-0 text-amber-500" />
-              <div className="text-sm">
-                <p className="font-semibold">Por cobrar</p>
-                <p className="text-muted-foreground">
-                  L. {stats.pendingPayments.toFixed(2)} · {stats.avgRepairDays} días prom.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Contexto del dia: una linea, no tres tarjetas */}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl border border-border bg-card px-5 py-3.5 text-sm">
+          {hoy.map((c) => (
+            <span key={c.title} className="flex items-baseline gap-1.5">
+              <span className="font-medium tabular">
+                {c.value ?? "—"}
+              </span>
+              <span className="text-muted-foreground">{c.title.toLowerCase()}</span>
+            </span>
+          ))}
+          {stats && (
+            <span className="flex items-baseline gap-1.5">
+              <span className="font-medium tabular" data-money>
+                L. {stats.pendingPayments.toFixed(2)}
+              </span>
+              <span className="text-muted-foreground">por cobrar</span>
+            </span>
+          )}
+          {stats && (
+            <span className="ml-auto text-xs text-muted-foreground tabular">
+              Semana: {stats.weekTickets} tickets · L. {stats.weekRevenue.toFixed(2)}
+              {"  ·  "}
+              Mes: {stats.monthDelivered} entregados · L. {stats.monthRevenue.toFixed(2)}
+            </span>
+          )}
+        </div>
 
         {/* ── Tickets en taller ──────────────────────── */}
         <section className="space-y-4">
@@ -320,7 +289,7 @@ export default function DashboardPage() {
               {Array.from({ length: 6 }).map((_, i) => (
                 <div
                   key={i}
-                  className="h-52 rounded-2xl border border-border/70 bg-card p-5"
+                  className="h-52 rounded-2xl border border-border bg-card p-5"
                 >
                   <div className="h-5 w-24 rounded shimmer" />
                   <div className="mt-4 h-6 w-40 rounded shimmer" />
@@ -330,8 +299,8 @@ export default function DashboardPage() {
               ))}
             </div>
           ) : tickets.length === 0 ? (
-            <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-card/50 py-16 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-brand-soft">
+            <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-card py-16 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
                 <ClipboardList className="h-8 w-8 text-primary" />
               </div>
               <div>
@@ -348,18 +317,18 @@ export default function DashboardPage() {
               </Button>
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 stagger">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {recentTickets.map((ticket) => {
-                const color = STATUS_VAR[ticket.status]
+                const color = statusBase(ticket.status)
                 const waTemplates = buildTicketWhatsAppTemplates(ticket)
                 return (
                   <article
                     key={ticket.id}
-                    className="hover-lift group relative flex flex-col overflow-hidden rounded-2xl border border-border/70 bg-card"
+                    className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-colors hover:border-input"
                   >
                     {/* Barra de acento por estado */}
                     <span
-                      className="absolute inset-y-0 left-0 w-1.5"
+                      className="absolute inset-y-0 left-0 w-1"
                       style={{ background: color }}
                       aria-hidden
                     />
@@ -372,15 +341,7 @@ export default function DashboardPage() {
                         <span className="font-mono text-sm font-bold text-primary">
                           {displayId(ticket)}
                         </span>
-                        <span
-                          className="rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                          style={{
-                            backgroundColor: `color-mix(in oklch, ${color} 16%, transparent)`,
-                            color,
-                          }}
-                        >
-                          {STATUS_LABELS[ticket.status]}
-                        </span>
+                        <StatusPill status={ticket.status} />
                         <Badge variant="secondary" className="text-[11px] font-medium">
                           {EQUIPMENT_LABELS[ticket.equipment_type] ?? ticket.equipment_type}
                         </Badge>
@@ -403,7 +364,7 @@ export default function DashboardPage() {
                     </ScrollSafeLink>
 
                     {/* Pie: contacto + cambio rápido de estado */}
-                    <div className="space-y-2.5 border-t border-border/70 bg-muted/30 px-5 py-3 pl-6">
+                    <div className="space-y-2.5 border-t border-border bg-muted/30 px-5 py-3 pl-6">
                       <div className="flex items-center justify-between gap-2">
                         <span className="flex items-center gap-1.5 text-sm font-medium">
                           <Smartphone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />

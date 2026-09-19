@@ -48,8 +48,8 @@ const fetcher = async (url: string): Promise<Ticket> => {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  recibido: "border-primary/20 bg-primary/10 text-primary",
-  received: "border-primary/20 bg-primary/10 text-primary",
+  recibido: "border-border bg-primary/10 text-primary",
+  received: "border-border bg-primary/10 text-primary",
   en_diagnostico: "border-warning/30 bg-warning/15 text-foreground",
   en_reparacion: "border-accent/30 bg-accent/15 text-accent-foreground",
   listo: "border-success/30 bg-success/15 text-success",
@@ -205,7 +205,6 @@ export default function TicketDetailPage({
     <DashboardLayout>
       <div className="mx-auto max-w-6xl space-y-6">
         <PageHeader
-          icon={ReceiptText}
           title={displayTicketNumber(ticket)}
           description="Ficha completa del equipo y su reparación."
           action={

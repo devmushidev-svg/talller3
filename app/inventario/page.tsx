@@ -214,7 +214,6 @@ export default function InventarioPage() {
     <DashboardLayout>
       <div className="space-y-8">
         <PageHeader
-          icon={Package}
           title="Inventario de Piezas"
           description={`${parts.length} pieza${parts.length !== 1 ? "s" : ""} almacenada${parts.length !== 1 ? "s" : ""} en el taller.`}
           action={
@@ -226,11 +225,11 @@ export default function InventarioPage() {
         />
 
         {/* ── Métricas ───────────────────────────── */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 stagger">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           {statCards.map((c) => (
             <div
               key={c.title}
-              className="hover-lift relative overflow-hidden rounded-2xl border border-border/70 bg-card p-4 sm:p-5"
+              className="relative overflow-hidden rounded-2xl border border-border bg-card p-4 sm:p-5"
             >
               <div
                 className="absolute -right-6 -top-6 h-20 w-20 rounded-full opacity-[0.12]"
@@ -311,7 +310,7 @@ export default function InventarioPage() {
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className="h-44 rounded-2xl border border-border/70 bg-card p-5"
+                className="h-44 rounded-2xl border border-border bg-card p-5"
               >
                 <div className="h-5 w-28 rounded shimmer" />
                 <div className="mt-4 h-6 w-40 rounded shimmer" />
@@ -321,8 +320,8 @@ export default function InventarioPage() {
             ))}
           </div>
         ) : filteredParts.length === 0 ? (
-          <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-card/50 py-16 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-brand-soft">
+          <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-card py-16 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
               <Package className="h-8 w-8 text-primary" />
             </div>
             <div>
@@ -341,14 +340,14 @@ export default function InventarioPage() {
             )}
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 stagger">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {filteredParts.map((part) => {
               const condition = (part.condition as PartCondition) || "bueno"
               const color = CONDITION_VAR[condition] || CONDITION_VAR.bueno
               return (
                 <article
                   key={part.id}
-                  className="hover-lift group relative flex flex-col overflow-hidden rounded-2xl border border-border/70 bg-card"
+                  className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card"
                 >
                   {/* Barra de acento por condición */}
                   <span
@@ -421,7 +420,7 @@ export default function InventarioPage() {
                   </div>
 
                   {/* Pie: acciones */}
-                  <div className="flex items-center justify-end gap-1 border-t border-border/70 bg-muted/30 px-5 py-2.5 pl-6">
+                  <div className="flex items-center justify-end gap-1 border-t border-border bg-muted/30 px-5 py-2.5 pl-6">
                     <Button
                       variant="ghost"
                       size="sm"

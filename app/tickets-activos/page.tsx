@@ -65,6 +65,7 @@ import { PrintInternal } from "@/components/print-internal"
 import { PhoneActions } from "@/components/phone-actions"
 import { buildTicketWhatsAppTemplates } from "@/lib/whatsapp"
 import { formatDateOnlyForDisplay } from "@/lib/date-utils"
+import { StatusPill, statusBase } from "@/components/status-pill"
 
 const statusOptions: TicketStatus[] = [
   "recibido",
@@ -99,30 +100,6 @@ function normalizeTicketStatus(status: unknown): TicketStatus {
     : (normalizedStatus as TicketStatus)
 }
 
-/** Color por estado (variable CSS, se adapta a claro/oscuro) */
-const STATUS_VAR: Record<TicketStatus, string> = {
-  recibido: "var(--chart-1)",
-  en_diagnostico: "var(--warning)",
-  en_reparacion: "var(--chart-2)",
-  listo: "var(--success)",
-  entregado: "var(--muted-foreground)",
-}
-
-/** Píldora de estado con tinte por color */
-function StatusPill({ status }: { status: TicketStatus }) {
-  const color = STATUS_VAR[status]
-  return (
-    <span
-      className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-      style={{
-        backgroundColor: `color-mix(in oklch, ${color} 16%, transparent)`,
-        color,
-      }}
-    >
-      {STATUS_LABELS[status]}
-    </span>
-  )
-}
 
 interface ScrollSafeTableRowProps {
   children: ReactNode
@@ -237,7 +214,7 @@ function ActiveTicketMobileCard({
 
   return (
     <article>
-      <Card className="overflow-hidden border-border/70 shadow-sm">
+      <Card className="overflow-hidden border-border shadow-sm">
         <CardContent className="space-y-4 p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 space-y-1">
@@ -254,7 +231,7 @@ function ActiveTicketMobileCard({
           <div className="flex flex-wrap gap-2 text-xs">
             <Badge variant="secondary" className="font-normal">{equipment}</Badge>
             {brandModel && (
-              <span className="rounded-full border border-border/70 px-2.5 py-1 text-muted-foreground">
+              <span className="rounded-full border border-border px-2.5 py-1 text-muted-foreground">
                 {brandModel}
               </span>
             )}
@@ -266,7 +243,7 @@ function ActiveTicketMobileCard({
             </p>
           )}
 
-          <div className="flex items-center justify-between gap-3 border-t border-border/70 pt-3 text-xs text-muted-foreground">
+          <div className="flex items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
             <span>{formattedDate}</span>
             {ticket.total_cost != null && ticket.total_cost > 0 && (
               <span className="font-semibold tabular-nums text-success">
@@ -650,7 +627,6 @@ export default function TicketsActivosPage() {
     <DashboardLayout>
       <div className="space-y-8">
         <PageHeader
-          icon={ClipboardList}
           title="Tickets Activos"
           description="Busca, filtra y gestiona los equipos en taller."
           action={<QRScanner onScan={handleQRScan} />}
@@ -687,7 +663,7 @@ export default function TicketsActivosPage() {
               </div>
 
               <CollapsibleContent className="space-y-4">
-                <div className="grid gap-4 border-t border-border/70 pt-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-4 border-t border-border pt-4 sm:grid-cols-2 lg:grid-cols-4">
                   <div className="space-y-2">
                     <Label>Estado</Label>
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -785,8 +761,8 @@ export default function TicketsActivosPage() {
               </CardContent>
             </Card>
           ) : tickets.length === 0 ? (
-            <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-card/50 py-16 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-brand-soft">
+            <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-card py-16 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
                 <Search className="h-8 w-8 text-primary" />
               </div>
               <div>
@@ -874,7 +850,7 @@ export default function TicketsActivosPage() {
                               }
                             >
                               <SelectTrigger
-                                className="h-9 w-[150px] border-border/70"
+                                className="h-9 w-[150px] border-border"
                                 aria-busy={savingStatusIds.has(ticket.id)}
                               >
                                 <StatusPill status={ticket.status} />
@@ -964,7 +940,7 @@ export default function TicketsActivosPage() {
 
               <div className="space-y-6 pt-2">
                 {/* Client Info */}
-                <div className="space-y-3 rounded-2xl border border-border/70 bg-muted/30 p-4">
+                <div className="space-y-3 rounded-2xl border border-border bg-muted/30 p-4">
                   <p className="text-sm font-semibold text-foreground">Datos del cliente</p>
                   <div className="space-y-2">
                     <Label htmlFor="edit-client-name">Nombre</Label>
@@ -1015,7 +991,7 @@ export default function TicketsActivosPage() {
                 </div>
 
                 {/* Equipment Info */}
-                <div className="rounded-2xl border border-border/70 p-4">
+                <div className="rounded-2xl border border-border p-4">
                   <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                     <div>
                       <p className="text-xs text-muted-foreground">Tipo</p>
@@ -1038,7 +1014,7 @@ export default function TicketsActivosPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="mt-4 border-t border-border/70 pt-4">
+                  <div className="mt-4 border-t border-border pt-4">
                     <p className="text-xs text-muted-foreground">Contraseña del equipo</p>
                     <p className="font-mono font-medium">
                       {selectedTicket.device_password?.trim() || "—"}
@@ -1109,7 +1085,7 @@ export default function TicketsActivosPage() {
 
                 {/* Diagnosis & Repair (editable) */}
                 {editMode ? (
-                  <div className="space-y-4 rounded-2xl border border-border/70 bg-muted/40 p-4">
+                  <div className="space-y-4 rounded-2xl border border-border bg-muted/40 p-4">
                     <div className="space-y-2">
                       <Label>Diagnóstico</Label>
                       <Textarea
@@ -1192,7 +1168,7 @@ export default function TicketsActivosPage() {
                     )}
 
                     {selectedTicket.total_cost != null && selectedTicket.total_cost > 0 && (
-                      <div className="grid grid-cols-2 gap-4 rounded-2xl border border-border/70 bg-muted/30 p-4 sm:grid-cols-4">
+                      <div className="grid grid-cols-2 gap-4 rounded-2xl border border-border bg-muted/30 p-4 sm:grid-cols-4">
                         <div>
                           <p className="text-xs text-muted-foreground">Mano de Obra</p>
                           <p className="font-medium tabular-nums">L. {selectedTicket.labor_cost?.toFixed(2) || '0.00'}</p>
@@ -1220,7 +1196,7 @@ export default function TicketsActivosPage() {
                 )}
 
                 {/* Actions */}
-                <div className="space-y-4 border-t border-border/70 pt-4">
+                <div className="space-y-4 border-t border-border pt-4">
                   <div className="space-y-2">
                     <Label>Cambiar estado</Label>
                     <Select

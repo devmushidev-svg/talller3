@@ -99,12 +99,20 @@ export const STATUS_LABELS: Record<TicketStatus, string> = {
   entregado: 'Entregado'
 }
 
-export const STATUS_COLORS: Record<TicketStatus, string> = {
-  recibido: 'bg-chart-1 text-primary-foreground',
-  en_diagnostico: 'bg-warning text-warning-foreground',
-  en_reparacion: 'bg-chart-2 text-white',
-  listo: 'bg-success text-success-foreground',
-  entregado: 'bg-muted text-muted-foreground'
+/**
+ * Tokens de color por estado. Cada estado tiene DOS valores y esa es la
+ * razon de que se lea:
+ *   base -> color vivo: barras, puntos, iconos (minimo 3:1)
+ *   fg   -> tinta: texto sobre el tinte del badge (minimo 4.5:1)
+ * Los valores viven en app/globals.css y se invierten solos entre temas.
+ * Ninguna pantalla debe volver a escribir un color de estado.
+ */
+export const STATUS_TOKENS: Record<TicketStatus, { base: string; fg: string }> = {
+  recibido: { base: 'var(--st-recibido)', fg: 'var(--st-recibido-fg)' },
+  en_diagnostico: { base: 'var(--st-diagnostico)', fg: 'var(--st-diagnostico-fg)' },
+  en_reparacion: { base: 'var(--st-reparacion)', fg: 'var(--st-reparacion-fg)' },
+  listo: { base: 'var(--st-listo)', fg: 'var(--st-listo-fg)' },
+  entregado: { base: 'var(--st-entregado)', fg: 'var(--st-entregado-fg)' }
 }
 
 export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {

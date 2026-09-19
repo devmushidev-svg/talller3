@@ -437,14 +437,13 @@ export default function NuevoTicketPage() {
     <DashboardLayout>
       <div className="mx-auto max-w-4xl space-y-8">
         <PageHeader
-          icon={PlusCircle}
           title="Nuevo Ticket"
           description="Registro rápido de equipos en el taller."
         />
 
         {/* Ayuda de navegación por teclado */}
         {!savedTicket && (
-          <div className="flex items-start gap-3 rounded-2xl border border-border/70 bg-gradient-brand-soft p-4 text-sm">
+          <div className="flex items-start gap-3 rounded-2xl border border-border bg-muted p-4 text-sm">
             <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-card text-primary shadow-sm">
               <Keyboard className="h-5 w-5" />
             </span>
@@ -466,7 +465,7 @@ export default function NuevoTicketPage() {
           <Card>
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-2.5 text-lg">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-brand-soft text-primary">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted text-primary">
                   <User className="h-5 w-5" />
                 </span>
                 Datos del Cliente
@@ -522,7 +521,7 @@ export default function NuevoTicketPage() {
 
               {/* Customer history button */}
               {customerExists && clientPhone && (
-                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-muted/40 px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-muted/40 px-4 py-3">
                   <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
                     <CheckCircle2 className="h-4 w-4 text-[var(--success)]" />
                     Cliente existente
@@ -535,7 +534,7 @@ export default function NuevoTicketPage() {
 
           {/* Quick templates */}
           {!savedTicket && (
-            <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/[0.035]">
+            <Card className="border-border bg-card">
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-2.5 text-lg">
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -566,7 +565,7 @@ export default function NuevoTicketPage() {
                         className={`h-auto min-h-16 justify-start whitespace-normal rounded-xl px-3 py-3 text-left ${
                           isActive
                             ? "border-primary bg-primary/10 text-foreground ring-1 ring-primary/20"
-                            : "border-border/70 bg-card/80"
+                            : "border-border bg-card"
                         }`}
                       >
                         <span className="min-w-0 space-y-1">
@@ -596,7 +595,7 @@ export default function NuevoTicketPage() {
           <Card>
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-2.5 text-lg">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-brand-soft text-primary">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted text-primary">
                   <Cpu className="h-5 w-5" />
                 </span>
                 Datos del Equipo
@@ -662,7 +661,7 @@ export default function NuevoTicketPage() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-border/70 bg-muted/25 p-3">
+              <div className="rounded-xl border border-border bg-muted/25 p-3">
                 <div className="flex min-h-5 items-center justify-between gap-3">
                   <p
                     id="modelSuggestionsHelp"
@@ -772,7 +771,7 @@ export default function NuevoTicketPage() {
           <Card>
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-2.5 text-lg">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-brand-soft text-primary">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted text-primary">
                   <Package className="h-5 w-5" />
                 </span>
                 Accesorios Recibidos
@@ -797,7 +796,7 @@ export default function NuevoTicketPage() {
                       className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm transition-colors ${
                         checked
                           ? "border-primary/40 bg-primary/5 text-foreground"
-                          : "border-border/70 bg-card text-muted-foreground hover:bg-muted/40"
+                          : "border-border bg-card text-muted-foreground hover:bg-muted/40"
                       }`}
                     >
                       <Checkbox
@@ -812,7 +811,7 @@ export default function NuevoTicketPage() {
                   )
                 })}
               </div>
-              <div className="mt-6 space-y-3 border-t border-border/70 pt-5">
+              <div className="mt-6 space-y-3 border-t border-border pt-5">
                 <Label>Otro accesorio o detalle</Label>
                 <p className="text-xs text-muted-foreground">
                   Puede añadir varios accesorios o detalles.
@@ -848,7 +847,7 @@ export default function NuevoTicketPage() {
                       .map((item) => (
                         <li
                           key={item}
-                          className="flex items-start justify-between gap-2 rounded-xl border border-border/70 bg-muted/40 px-3 py-2"
+                          className="flex items-start justify-between gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2"
                         >
                           <span>{item}</span>
                           <Button
@@ -873,7 +872,7 @@ export default function NuevoTicketPage() {
           <Card>
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-2.5 text-lg">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-brand-soft text-primary">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted text-primary">
                   <FileText className="h-5 w-5" />
                 </span>
                 Información Adicional

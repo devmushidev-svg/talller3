@@ -3,93 +3,173 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ══════════════════════════════════════════════════════════════════
+   TALLER A OSCURAS
+   Fondo carbón, superficies por capas, tinta casi blanca.
+   El acento es la ausencia de color: el botón primario es blanco.
+   El único color de la pantalla es el estado del ticket.
+
+   Reglas que este archivo hace cumplir:
+   · Ningún degradado. Ningún color decorativo.
+   · Sombras solo para separar capas (popovers), nunca para adornar.
+   · Un solo radio base; todo lo demás se deriva de él.
+   · Ninguna pantalla vuelve a escribir un color.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─── TEMA CLARO ──────────────────────────────────────────────────
+   El acento invierte: sobre claro, la tinta máxima es casi negra.   */
 :root {
-  --background: oklch(0.985 0.006 265);
-  --foreground: oklch(0.18 0.02 265);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.02 265);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.02 265);
-  --primary: oklch(0.54 0.21 270);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.965 0.012 270);
-  --secondary-foreground: oklch(0.28 0.02 270);
-  --muted: oklch(0.95 0.01 270);
-  --muted-foreground: oklch(0.5 0.025 270);
-  --accent: oklch(0.62 0.2 310);
-  --accent-foreground: oklch(0.99 0 0);
-  --destructive: oklch(0.58 0.23 25);
-  --destructive-foreground: oklch(0.99 0 0);
-  --border: oklch(0.91 0.012 270);
-  --input: oklch(0.93 0.012 270);
-  --ring: oklch(0.54 0.21 270);
-  --chart-1: oklch(0.54 0.21 270);
-  --chart-2: oklch(0.6 0.19 200);
-  --chart-3: oklch(0.7 0.17 60);
-  --chart-4: oklch(0.62 0.2 310);
-  --chart-5: oklch(0.58 0.2 25);
-  --radius: 0.85rem;
-  --sidebar: oklch(0.16 0.03 275);
-  --sidebar-foreground: oklch(0.92 0.012 270);
-  --sidebar-primary: oklch(0.58 0.22 270);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.26 0.05 275);
-  --sidebar-accent-foreground: oklch(0.97 0.01 270);
-  --sidebar-border: oklch(0.28 0.04 275);
-  --sidebar-ring: oklch(0.58 0.22 270);
-  --success: oklch(0.62 0.17 162);
-  --success-foreground: oklch(0.99 0 0);
-  --warning: oklch(0.78 0.16 75);
-  --warning-foreground: oklch(0.25 0.03 75);
-  /* Gradientes de marca */
-  --gradient-brand: linear-gradient(135deg, oklch(0.56 0.22 275), oklch(0.62 0.2 320));
-  --gradient-brand-soft: linear-gradient(135deg, oklch(0.56 0.22 275 / 0.12), oklch(0.62 0.2 320 / 0.12));
+  --background: #fafafa;
+  --foreground: #18181b;        /* 15.9:1 sobre background */
+
+  --card: #ffffff;
+  --card-foreground: #18181b;
+  --popover: #ffffff;
+  --popover-foreground: #18181b;
+
+  /* Acento = tinta máxima del tema */
+  --primary: #18181b;
+  --primary-foreground: #fafafa;
+
+  /* secondary / muted / accent son SUPERFICIES, no colores de marca */
+  --secondary: #f4f4f5;
+  --secondary-foreground: #27272a;
+  --muted: #f4f4f5;
+  --muted-foreground: #52525b;  /* 7.4:1 sobre card */
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+
+  --destructive: #c2251f;       /* como texto sobre card */
+  --destructive-foreground: #ffffff;
+
+  --border: #e4e4e7;            /* separación decorativa entre capas */
+  --input: #8e8e99;             /* contorno de control: 3:1 sobre card */
+  --ring: #18181b;              /* anillo de foco */
+
+  /* Barra lateral: misma familia que el resto, no un tema aparte */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #18181b;
+  --sidebar-primary: #18181b;
+  --sidebar-primary-foreground: #fafafa;
+  --sidebar-accent: #f4f4f5;
+  --sidebar-accent-foreground: #18181b;
+  --sidebar-border: #e4e4e7;
+  --sidebar-ring: #18181b;
+
+  /* ── Estados: reservados, nunca decorativos ──
+     Cada estado tiene DOS valores, y esa es la razón de que se lea:
+       --st-x      color vivo   → barras, puntos, íconos   (≥ 3:1)
+       --st-x-fg   color tinta  → texto sobre el tinte     (≥ 4.5:1)
+     El fondo del badge se deriva: color-mix(--st-x 16%, --card).     */
+  --st-recibido: #2563eb;
+  --st-recibido-fg: #1d4ed8;
+  --st-diagnostico: #d97706;
+  --st-diagnostico-fg: #9a5b06;
+  --st-reparacion: #0891b2;
+  --st-reparacion-fg: #0a5a70;
+  --st-listo: #16a34a;
+  --st-listo-fg: #11692f;
+  --st-entregado: #71717a;
+  --st-entregado-fg: #52525b;
+
+  /* Alias semánticos — mismos valores, otro nombre de uso */
+  --success: var(--st-listo);
+  --success-fg: var(--st-listo-fg);
+  --success-foreground: #ffffff;
+  --warning: var(--st-diagnostico);
+  --warning-fg: var(--st-diagnostico-fg);
+  --warning-foreground: #ffffff;
+  --danger: var(--destructive);
+  --danger-fg: #b02520;
+
+  /* Serie de gráficos: un solo tono en rampa de opacidad, sin arcoíris */
+  --chart-1: #18181b;
+  --chart-2: #3f3f46;
+  --chart-3: #71717a;
+  --chart-4: #a1a1aa;
+  --chart-5: #d4d4d8;
+
+  --radius: 0.625rem;
+
+  /* Sombras: solo separan capas. Dos, y no más. */
+  --shadow-layer: 0 1px 2px 0 rgb(24 24 27 / 0.06);
+  --shadow-float: 0 8px 24px -8px rgb(24 24 27 / 0.16);
 }
 
+/* ─── TEMA OSCURO — el principal ──────────────────────────────────
+   Carbón #0b0b0c, no negro puro: el blanco sobre negro absoluto
+   produce halo en OLED y cansa la vista en un turno largo.           */
 .dark {
-  --background: oklch(0.15 0.025 275);
-  --foreground: oklch(0.96 0.01 270);
-  --card: oklch(0.19 0.03 275);
-  --card-foreground: oklch(0.96 0.01 270);
-  --popover: oklch(0.19 0.03 275);
-  --popover-foreground: oklch(0.96 0.01 270);
-  --primary: oklch(0.62 0.21 272);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.25 0.03 275);
-  --secondary-foreground: oklch(0.93 0.01 270);
-  --muted: oklch(0.25 0.03 275);
-  --muted-foreground: oklch(0.68 0.025 270);
-  --accent: oklch(0.66 0.2 312);
-  --accent-foreground: oklch(0.99 0 0);
-  --destructive: oklch(0.62 0.22 25);
-  --destructive-foreground: oklch(0.99 0 0);
-  --border: oklch(0.28 0.03 275);
-  --input: oklch(0.26 0.03 275);
-  --ring: oklch(0.62 0.21 272);
-  --chart-1: oklch(0.62 0.21 272);
-  --chart-2: oklch(0.66 0.2 200);
-  --chart-3: oklch(0.74 0.18 70);
-  --chart-4: oklch(0.66 0.2 312);
-  --chart-5: oklch(0.64 0.22 25);
-  --sidebar: oklch(0.13 0.025 278);
-  --sidebar-foreground: oklch(0.92 0.012 270);
-  --sidebar-primary: oklch(0.62 0.21 272);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.24 0.04 278);
-  --sidebar-accent-foreground: oklch(0.97 0.01 270);
-  --sidebar-border: oklch(0.26 0.035 278);
-  --sidebar-ring: oklch(0.62 0.21 272);
-  --success: oklch(0.64 0.17 162);
-  --success-foreground: oklch(0.99 0 0);
-  --warning: oklch(0.78 0.16 75);
-  --warning-foreground: oklch(0.22 0.03 75);
-  --gradient-brand: linear-gradient(135deg, oklch(0.62 0.21 275), oklch(0.66 0.2 320));
-  --gradient-brand-soft: linear-gradient(135deg, oklch(0.62 0.21 275 / 0.16), oklch(0.66 0.2 320 / 0.16));
+  --background: #0b0b0c;
+  --foreground: #f4f4f5;        /* 16.8:1 sobre background */
+
+  --card: #131316;              /* superficie de trabajo, sube una capa */
+  --card-foreground: #f4f4f5;
+  --popover: #1a1a1f;           /* flota sobre la tarjeta */
+  --popover-foreground: #f4f4f5;
+
+  /* Acento = tinta máxima del tema. Botón blanco, texto carbón. */
+  --primary: #fafafa;
+  --primary-foreground: #0b0b0c;
+
+  --secondary: #1c1c21;
+  --secondary-foreground: #e4e4e7;
+  --muted: #1c1c21;
+  --muted-foreground: #a1a1aa;  /* 7.3:1 sobre card */
+  --accent: #26262c;
+  --accent-foreground: #fafafa;
+
+  --destructive: #f87171;
+  --destructive-foreground: #0b0b0c;
+
+  --border: #2e2e35;            /* separacion decorativa entre capas */
+  --input: #63636d;             /* contorno de control: 3:1 sobre card */
+  --ring: #d4d4d8;
+
+  --sidebar: #0e0e10;
+  --sidebar-foreground: #e4e4e7;
+  --sidebar-primary: #fafafa;
+  --sidebar-primary-foreground: #0b0b0c;
+  --sidebar-accent: #1c1c21;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: #1f1f24;
+  --sidebar-ring: #d4d4d8;
+
+  /* Estados: sobre oscuro se invierte — tinte oscuro, tinta clara */
+  --st-recibido: #60a5fa;
+  --st-recibido-fg: #93c5fd;
+  --st-diagnostico: #fbbf24;
+  --st-diagnostico-fg: #fcd34d;
+  --st-reparacion: #22d3ee;
+  --st-reparacion-fg: #67e8f9;
+  --st-listo: #4ade80;
+  --st-listo-fg: #86efac;
+  --st-entregado: #a1a1aa;
+  --st-entregado-fg: #d4d4d8;
+
+  --success: var(--st-listo);
+  --success-fg: var(--st-listo-fg);
+  --success-foreground: #0b0b0c;
+  --warning: var(--st-diagnostico);
+  --warning-fg: var(--st-diagnostico-fg);
+  --warning-foreground: #0b0b0c;
+  --danger: var(--destructive);
+  --danger-fg: #fca5a5;
+
+  --chart-1: #fafafa;
+  --chart-2: #d4d4d8;
+  --chart-3: #a1a1aa;
+  --chart-4: #71717a;
+  --chart-5: #52525b;
+
+  --shadow-layer: 0 1px 2px 0 rgb(0 0 0 / 0.40);
+  --shadow-float: 0 8px 24px -8px rgb(0 0 0 / 0.60);
 }
 
 @theme inline {
-  --font-sans: 'Geist', 'Geist Fallback';
-  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --font-sans: var(--font-geist), 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: var(--font-geist-mono), 'Geist Mono', ui-monospace, 'SFMono-Regular', 'Consolas', monospace;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -109,19 +189,22 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+
   --color-success: var(--success);
+  --color-success-fg: var(--success-fg);
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
+  --color-warning-fg: var(--warning-fg);
   --color-warning-foreground: var(--warning-foreground);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --color-danger: var(--danger);
+  --color-danger-fg: var(--danger-fg);
+
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -130,36 +213,69 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Un solo radio base; todos los demás se derivan de él.
+     Una tarjeta es siempre rounded-2xl = 14px, en todas las pantallas. */
+  --radius-xs: calc(var(--radius) - 6px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 2px);
+  --radius-2xl: calc(var(--radius) + 4px);
+
+  --shadow-sm: var(--shadow-layer);
+  --shadow-md: var(--shadow-layer);
+  --shadow-lg: var(--shadow-float);
+  --shadow-xl: var(--shadow-float);
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
+
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+
   body {
     @apply bg-background text-foreground;
-    /* Fondo con sutiles destellos de color (mesh) */
-    background-image:
-      radial-gradient(60rem 60rem at 110% -10%, oklch(0.62 0.2 320 / 0.08), transparent 60%),
-      radial-gradient(50rem 50rem at -10% 0%, oklch(0.56 0.22 275 / 0.08), transparent 55%);
-    background-attachment: fixed;
+    /* Sin mesh, sin degradados de fondo. El fondo es un color. */
+    -webkit-tap-highlight-color: transparent;
   }
+
+  /* Anillo de foco visible, un solo estilo en toda la app */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
   ::selection {
-    background: oklch(0.56 0.22 275 / 0.25);
+    background: var(--foreground);
+    color: var(--background);
   }
-  /* Scrollbar moderno */
+
+  /* El dinero y los identificadores siempre alineados en columna */
+  .tabular,
+  [data-money] {
+    font-variant-numeric: tabular-nums;
+  }
+
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
+    scrollbar-color: var(--input) transparent;
   }
   *::-webkit-scrollbar {
-    width: 9px;
-    height: 9px;
+    width: 10px;
+    height: 10px;
   }
   *::-webkit-scrollbar-thumb {
-    background: var(--border);
+    background: var(--input);
     border-radius: 999px;
-    border: 2px solid transparent;
+    border: 3px solid transparent;
     background-clip: padding-box;
   }
   *::-webkit-scrollbar-thumb:hover {
@@ -168,92 +284,54 @@
   }
 }
 
-/* ─── Animaciones ─────────────────────────────────────── */
-@keyframes fade-in-up {
-  from { opacity: 0; transform: translateY(14px); }
-  to   { opacity: 1; transform: translateY(0); }
+@layer utilities {
+  /* Fondo del badge de estado, derivado del color vivo del estado.
+     Se usa con --st: <token> en el style del elemento. */
+  .estado-tinte {
+    background-color: color-mix(in oklab, var(--st) 16%, var(--card));
+  }
+
+  /* Objetivo táctil mínimo para una app que se usa con guantes */
+  .tactil {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }
+
+/* ─── Animaciones ──────────────────────────────────────────────────
+   Solo las que comunican: aparecer, escalar (diálogos) y cargar.
+   Nada de flotar, latir ni brillar.                                  */
 @keyframes fade-in {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 @keyframes scale-in {
-  from { opacity: 0; transform: scale(0.96); }
+  from { opacity: 0; transform: scale(0.98); }
   to   { opacity: 1; transform: scale(1); }
 }
-@keyframes slide-in-left {
-  from { opacity: 0; transform: translateX(-12px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-6px); }
-}
 @keyframes shimmer {
-  100% { background-position: 200% 0; }
-}
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 oklch(0.56 0.22 275 / 0.4); }
-  50%      { box-shadow: 0 0 0 8px oklch(0.56 0.22 275 / 0); }
+  100% { background-position: -200% 0; }
 }
 
 @layer utilities {
-  .animate-fade-in-up { animation: fade-in-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
-  .animate-fade-in    { animation: fade-in 0.5s ease both; }
-  .animate-scale-in   { animation: scale-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
-  .animate-slide-in-left { animation: slide-in-left 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
-  .animate-float      { animation: float 4s ease-in-out infinite; }
-  .animate-pulse-glow { animation: pulse-glow 2.2s ease-in-out infinite; }
+  .animate-fade-in    { animation: fade-in 0.2s ease both; }
+  .animate-fade-in-up { animation: fade-in-up 0.25s ease-out both; }
+  .animate-scale-in   { animation: scale-in 0.16s ease-out both; }
 
-  /* Retrasos escalonados para listas */
-  .stagger > * { animation: fade-in-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
-  .stagger > *:nth-child(1) { animation-delay: 0.04s; }
-  .stagger > *:nth-child(2) { animation-delay: 0.09s; }
-  .stagger > *:nth-child(3) { animation-delay: 0.14s; }
-  .stagger > *:nth-child(4) { animation-delay: 0.19s; }
-  .stagger > *:nth-child(5) { animation-delay: 0.24s; }
-  .stagger > *:nth-child(6) { animation-delay: 0.29s; }
-  .stagger > *:nth-child(7) { animation-delay: 0.34s; }
-  .stagger > *:nth-child(8) { animation-delay: 0.39s; }
-  .stagger > *:nth-child(n+9) { animation-delay: 0.44s; }
-
-  /* Texto y fondos con gradiente de marca */
-  .text-gradient {
-    background: var(--gradient-brand);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    color: transparent;
-  }
-  .bg-gradient-brand { background: var(--gradient-brand); }
-  .bg-gradient-brand-soft { background: var(--gradient-brand-soft); }
-
-  /* Tarjeta de cristal */
-  .glass {
-    background: color-mix(in oklch, var(--card) 80%, transparent);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-  }
-
-  /* Elevación interactiva suave */
-  .hover-lift {
-    transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
-                box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1);
-  }
-  /* Brillo que recorre (carga) */
+  /* Esqueleto de carga */
   .shimmer {
-    background: linear-gradient(90deg,
-      var(--muted) 25%, color-mix(in oklch, var(--muted) 60%, white) 37%, var(--muted) 63%);
+    background-image: linear-gradient(
+      90deg,
+      var(--muted) 0%,
+      color-mix(in oklab, var(--muted) 55%, var(--foreground)) 50%,
+      var(--muted) 100%
+    );
     background-size: 200% 100%;
-    animation: shimmer 1.4s ease infinite;
-  }
-}
-
-/* Evita el estado hover "pegado" y los saltos de tarjetas en pantallas táctiles. */
-@media (hover: hover) and (pointer: fine) {
-  .hover-lift:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 12px 28px -10px oklch(0.5 0.1 275 / 0.35);
+    animation: shimmer 1.6s linear infinite;
   }
 }
 
@@ -265,27 +343,31 @@
   }
 }
 
-/* Print styles for POS thermal printers */
+/* ─── Impresión térmica (58mm/80mm) ───────────────────────────────
+   Se imprime SIEMPRE en claro, sin importar el tema de pantalla.    */
 @media print {
   @page {
     margin: 2mm;
     size: auto;
   }
-  
+
+  html,
   body {
+    background: #fff !important;
+    color: #000 !important;
+    color-scheme: light !important;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
-  
+
   .no-print {
     display: none !important;
   }
-  
+
   .print-only {
     display: block !important;
   }
-  
-  /* Receipt ticket styles - 58mm/80mm compatible */
+
   .receipt-ticket {
     width: 100%;
     max-width: 72mm;
@@ -296,20 +378,19 @@
     background: #fff;
     padding: 2mm;
   }
-  
+
   .receipt-ticket h1 {
     font-size: 14px;
     text-align: center;
     font-weight: bold;
     margin-bottom: 4px;
   }
-  
+
   .receipt-ticket .divider {
     border-top: 1px dashed #000;
     margin: 4px 0;
   }
-  
-  /* Accessory labels - very small */
+
   .accessory-label {
     width: 40mm;
     height: 20mm;

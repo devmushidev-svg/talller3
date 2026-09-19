@@ -4,7 +4,7 @@ import { useEffect, useId, useState } from "react"
 import {
   AlertCircle,
   ArrowUpRight,
-  Hash,
+
   LoaderCircle,
   Monitor,
   Phone,
@@ -49,11 +49,11 @@ export interface GlobalTicketSearchProps {
 const STATUS_META: Record<string, { label: string; className: string }> = {
   recibido: {
     label: "Recibido",
-    className: "border-primary/20 bg-primary/10 text-primary",
+    className: "border-border bg-primary/10 text-primary",
   },
   received: {
     label: "Recibido",
-    className: "border-primary/20 bg-primary/10 text-primary",
+    className: "border-border bg-primary/10 text-primary",
   },
   en_diagnostico: {
     label: "En diagnóstico",
@@ -165,7 +165,7 @@ function ResultSkeleton() {
       {Array.from({ length: 3 }).map((_, index) => (
         <div
           key={index}
-          className="flex min-h-20 items-center gap-3 rounded-xl border border-border/60 p-3"
+          className="flex min-h-20 items-center gap-3 rounded-xl border border-border p-3"
         >
           <div className="size-10 shrink-0 rounded-xl bg-muted shimmer" />
           <div className="min-w-0 flex-1 space-y-2">
@@ -263,23 +263,12 @@ export function GlobalTicketSearch({
   return (
     <Card
       className={cn(
-        "overflow-hidden border-primary/15 p-0 shadow-md shadow-primary/[0.05]",
+        "overflow-hidden border-border p-0",
         className
       )}
     >
-      <div className="bg-gradient-brand-soft px-4 py-4 sm:px-5">
-        <div className="mb-3 flex items-start gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm shadow-primary/25">
-            <Search className="size-5" aria-hidden="true" />
-          </div>
-          <div className="min-w-0">
-            <h2 className="font-semibold leading-tight">Buscar cualquier ticket</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Activos, entregados, cerrados o cancelados.
-            </p>
-          </div>
-        </div>
-
+      {/* Sin titulo ni chip de icono: el campo ya dice que hace. */}
+      <div className="px-4 py-4 sm:px-5">
         <label className="sr-only" htmlFor={inputId}>
           Buscar por número, cliente, teléfono, equipo, modelo o serie
         </label>
@@ -299,7 +288,7 @@ export function GlobalTicketSearch({
             placeholder="N° ticket, nombre o modelo"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            className="h-12 rounded-xl bg-background pl-10 pr-12 text-base shadow-sm md:text-sm"
+            className="h-12 pl-10 pr-12 text-base md:text-base"
             aria-describedby={`${inputId}-hint`}
           />
           {query && (
@@ -319,13 +308,9 @@ export function GlobalTicketSearch({
       </div>
 
       <CardContent className="p-0" aria-live="polite" aria-busy={isLoading}>
-        {!trimmedQuery ? (
-          <SearchMessage
-            icon={Hash}
-            title="Encuentra un ticket en segundos"
-            description="Escribe un dato del cliente o del equipo para comenzar."
-          />
-        ) : !searchable ? (
+        {/* En reposo no se dibuja nada: la pista bajo el campo ya lo dice,
+            y un bloque vacio de 180px es espacio muerto en cada carga. */}
+        {!trimmedQuery ? null : !searchable ? (
           <SearchMessage
             icon={Search}
             title="Escribe al menos 2 letras"
@@ -333,7 +318,7 @@ export function GlobalTicketSearch({
           />
         ) : isLoading ? (
           <div>
-            <div className="flex items-center gap-2 border-b border-border/60 px-4 py-3 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2 border-b border-border px-4 py-3 text-sm text-muted-foreground">
               <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
               Buscando en todos los tickets…
             </div>
@@ -364,13 +349,13 @@ export function GlobalTicketSearch({
           />
         ) : (
           <div>
-            <div className="flex items-center justify-between border-b border-border/60 px-4 py-3 text-sm">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3 text-sm">
               <span className="font-medium">
                 {results.length} resultado{results.length === 1 ? "" : "s"}
               </span>
               <span className="text-xs text-muted-foreground">Todos los estados</span>
             </div>
-            <ul className="max-h-[28rem] divide-y divide-border/60 overflow-y-auto overscroll-contain">
+            <ul className="max-h-[28rem] divide-y divide-border overflow-y-auto overscroll-contain">
               {results.map((ticket) => (
                 <TicketResult key={ticket.id} ticket={ticket} />
               ))}

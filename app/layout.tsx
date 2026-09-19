@@ -1,19 +1,20 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
+import { ThemeProvider } from '@/components/theme-provider'
+import { Toaster } from '@/components/ui/sonner'
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const geist = Geist({ subsets: ['latin'], variable: '--font-geist' })
+const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' })
 
 export const metadata: Metadata = {
   title: 'Multiplanet - Sistema de Tickets',
-  description: 'Sistema de gestión de tickets para Multiplanet - Reparación de impresoras y computadoras',
-  generator: 'v0.app',
+  description:
+    'Sistema de gestión de tickets para Multiplanet - Reparación de impresoras y computadoras',
   manifest: '/manifest.json',
-  themeColor: '#3b82f6',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'default',
+    statusBarStyle: 'black-translucent',
     title: 'Multiplanet',
   },
   icons: {
@@ -25,21 +26,36 @@ export const metadata: Metadata = {
   },
 }
 
+export const viewport: Viewport = {
+  // Sale de los tokens: carbón en oscuro, casi blanco en claro.
+  themeColor: [
+    { media: '(prefers-color-scheme: dark)', color: '#0b0b0c' },
+    { media: '(prefers-color-scheme: light)', color: '#fafafa' },
+  ],
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
   return (
-    <html lang="es">
+    <html lang="es" suppressHydrationWarning>
       <head>
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Multiplanet" />
       </head>
-      <body className="font-sans antialiased">
-        {children}
+      <body className={`${geist.variable} ${geistMono.variable} font-sans antialiased`}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem={false}
+          disableTransitionOnChange
+        >
+          {children}
+          <Toaster />
+        </ThemeProvider>
         <script
           dangerouslySetInnerHTML={{
             __html: `

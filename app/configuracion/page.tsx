@@ -84,7 +84,6 @@ export default function ConfiguracionPage() {
       <DashboardLayout>
         <div className="mx-auto max-w-3xl space-y-8">
           <PageHeader
-            icon={Settings}
             title="Configuración"
             description="Ajustes del taller y la impresión."
           />
@@ -92,7 +91,7 @@ export default function ConfiguracionPage() {
             {Array.from({ length: 2 }).map((_, i) => (
               <div
                 key={i}
-                className="rounded-2xl border border-border/70 bg-card p-6"
+                className="rounded-2xl border border-border bg-card p-6"
               >
                 <div className="flex items-center gap-3">
                   <div className="h-11 w-11 shrink-0 rounded-xl shimmer" />
@@ -117,7 +116,6 @@ export default function ConfiguracionPage() {
     <DashboardLayout>
       <div className="mx-auto max-w-3xl space-y-8">
         <PageHeader
-          icon={Settings}
           title="Configuración"
           description="Ajustes del taller y la impresión."
           action={
@@ -132,7 +130,7 @@ export default function ConfiguracionPage() {
           }
         />
 
-        <div className="space-y-6 stagger">
+        <div className="space-y-6">
           {/* ── Datos del taller ───────────────────────── */}
           <Card>
             <CardHeader>

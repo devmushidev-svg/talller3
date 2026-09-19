@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { History, Phone, User, Package, DollarSign, Loader2 } from 'lucide-react'
-import { Ticket } from '@/lib/types'
+import { Ticket, type TicketStatus } from '@/lib/types'
+import { StatusPill } from '@/components/status-pill'
 
 interface CustomerHistoryProps {
   phone: string
@@ -20,14 +21,6 @@ interface HistoryData {
     completedTickets: number
     totalSpent: number
   }
-}
-
-const statusColors: Record<string, string> = {
-  recibido: 'bg-blue-100 text-blue-800',
-  'en_diagnostico': 'bg-yellow-100 text-yellow-800',
-  'en_reparacion': 'bg-orange-100 text-orange-800',
-  listo: 'bg-green-100 text-green-800',
-  entregado: 'bg-gray-100 text-gray-800',
 }
 
 const statusLabels: Record<string, string> = {
@@ -141,9 +134,7 @@ export function CustomerHistory({ phone, name }: CustomerHistoryProps) {
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-mono text-sm font-medium">{ticket.id}</span>
-                            <Badge className={statusColors[ticket.status] || 'bg-gray-100'}>
-                              {statusLabels[ticket.status] || ticket.status}
-                            </Badge>
+                            <StatusPill status={ticket.status as TicketStatus} />
                           </div>
                           <p className="text-sm">
                             {ticket.equipment_type} - {ticket.brand} {ticket.model}
