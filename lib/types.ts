@@ -142,6 +142,18 @@ export const EQUIPMENT_PICKER_TYPES: readonly EquipmentType[] = [
   'otro'
 ]
 
+/**
+ * Equipos que pueden tener contrasena.
+ *
+ * Una impresora o un monitor no la tienen, asi que ni se pregunta: un campo
+ * que nadie completa es ruido, y la confirmacion de "seguro que no tiene"
+ * seria una pregunta sin sentido. 'otro' entra porque puede ser un telefono
+ * o una tablet.
+ */
+export function equipoPuedeTenerClave(tipo: EquipmentType): boolean {
+  return tipo === 'computadora' || tipo === 'laptop' || tipo === 'otro'
+}
+
 export const EQUIPMENT_LABELS: Record<EquipmentType, string> = {
   impresora: 'Impresora',
   computadora: 'Computadora',

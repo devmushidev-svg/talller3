@@ -54,6 +54,7 @@ import {
   EQUIPMENT_LABELS,
   EQUIPMENT_PICKER_TYPES,
   accessoryMatchesCheckbox,
+  equipoPuedeTenerClave,
   isStandardAccessoryStored,
   type EquipmentType,
   type Ticket,
@@ -215,11 +216,15 @@ export default function NuevoTicketPage() {
   const sugerencias = sugerirProblemas(problemDescription, equipmentType)
   const yaEsExacto = sugerencias.some((s) => s.plantilla === problemDescription)
 
+  const pideClave = equipoPuedeTenerClave(equipmentType)
+
   const irAlPaso3 = () => {
     if (!paso2Ok) return
-    // Una clave en blanco puede significar "no tiene" o "me olvide de pedirla".
-    // Son cosas distintas y la segunda se descubre con el cliente ya afuera.
-    if (!devicePassword.trim()) {
+    // Solo se confirma en equipos que PUEDEN tener clave. En una impresora la
+    // pregunta no tiene sentido. Y en los que si: una clave en blanco puede
+    // significar "no tiene" o "me olvide de pedirla", y la segunda se descubre
+    // con el cliente ya afuera.
+    if (pideClave && !devicePassword.trim()) {
       setConfirmarSinClave(true)
       return
     }
@@ -505,7 +510,15 @@ export default function NuevoTicketPage() {
                 <Label htmlFor="tipo">Tipo de equipo</Label>
                 <Select
                   value={equipmentType}
-                  onValueChange={(v) => setEquipmentType(v as EquipmentType)}
+                  onValueChange={(v) => {
+                    const tipo = v as EquipmentType
+                    setEquipmentType(tipo)
+                    // Si el equipo nuevo no puede tener clave, se descarta la
+                    // que hubiera quedado escrita: guardar la contrasena de una
+                    // computadora en el ticket de una impresora es peor que
+                    // perderla.
+                    if (!equipoPuedeTenerClave(tipo)) setDevicePassword("")
+                  }}
                 >
                   <SelectTrigger id="tipo" className="w-full">
                     <SelectValue />
@@ -542,15 +555,17 @@ export default function NuevoTicketPage() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="clave">Contraseña del equipo</Label>
-                <Input
-                  id="clave"
-                  value={devicePassword}
-                  onChange={(e) => setDevicePassword(e.target.value)}
-                  placeholder="Déjelo vacío si no tiene"
-                />
-              </div>
+              {pideClave && (
+                <div className="space-y-2">
+                  <Label htmlFor="clave">Contraseña del equipo</Label>
+                  <Input
+                    id="clave"
+                    value={devicePassword}
+                    onChange={(e) => setDevicePassword(e.target.value)}
+                    placeholder="Déjelo vacío si no tiene"
+                  />
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="problema">Problema reportado</Label>
@@ -737,7 +752,8 @@ export default function NuevoTicketPage() {
                 </p>
                 <p className="text-muted-foreground">
                   {EQUIPMENT_LABELS[equipmentType]} {brand} {model}
-                  {devicePassword.trim() ? " · con contraseña" : " · sin contraseña"}
+                  {pideClave &&
+                    (devicePassword.trim() ? " · con contraseña" : " · sin contraseña")}
                 </p>
                 <p className="text-muted-foreground">
                   {accessories.length > 0
