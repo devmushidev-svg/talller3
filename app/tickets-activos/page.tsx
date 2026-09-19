@@ -37,7 +37,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import {
   Ticket,
   TicketStatus,
@@ -49,11 +48,11 @@ import {
   Eye,
   Printer,
   Loader2,
-  Filter,
   Calendar,
   Tag,
   Image as ImageIcon,
   ClipboardList,
+  ArrowDownUp,
   SearchX,
   Smartphone,
   X,
@@ -71,6 +70,7 @@ import { toast } from "sonner"
 import Link from "next/link"
 import { EstadoError, EstadoVacio } from "@/components/estado-lista"
 import { mensajeDeError } from "@/lib/fetch-lista"
+import { cn } from "@/lib/utils"
 
 const statusOptions: TicketStatus[] = [
   "recibido",
@@ -86,6 +86,31 @@ const activeStatusOptions: Exclude<TicketStatus, "entregado">[] = [
   "en_reparacion",
   "listo",
 ]
+
+/**
+ * Las cuatro vistas de la pantalla.
+ *
+ * Reemplazan al panel de filtros desplegable: las tres preguntas que se hacen
+ * de verdad son "que hay en taller", "que puedo entregar" y "que se entrego".
+ * `scope: "active"` pide solo los no entregados; las otras dos traen todo.
+ */
+type Vista = "activos" | "listos" | "entregados" | "todos"
+
+const VISTAS: { id: Vista; label: string; soloActivos: boolean }[] = [
+  { id: "activos", label: "En taller", soloActivos: true },
+  { id: "listos", label: "Listos para entregar", soloActivos: true },
+  { id: "entregados", label: "Entregados", soloActivos: false },
+  { id: "todos", label: "Todos", soloActivos: false },
+]
+
+function perteneceALaVista(estado: string, vista: Vista) {
+  const e = estado.toLowerCase()
+  const entregado = e === "entregado" || e === "delivered"
+  if (vista === "entregados") return entregado
+  if (vista === "listos") return e === "listo"
+  if (vista === "activos") return !entregado
+  return true
+}
 
 const ACTIVE_STATUS_VALUES = new Set([
   ...activeStatusOptions,
@@ -323,17 +348,16 @@ export default function TicketsActivosPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [reintento, setReintento] = useState(0)
-  const [showFilters, setShowFilters] = useState(false)
+
   const [savingStatusIds, setSavingStatusIds] = useState<Set<string>>(
     () => new Set()
   )
   const ticketsRequestIdRef = useRef(0)
 
   // Advanced filters
-  const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [equipmentFilter, setEquipmentFilter] = useState<string>("all")
-  const [dateFrom, setDateFrom] = useState("")
-  const [dateTo, setDateTo] = useState("")
+  const [vista, setVista] = useState<Vista>("activos")
+  /** "nuevos" = los ultimos arriba; "viejos" = lo que lleva mas tiempo. */
+  const [orden, setOrden] = useState<"nuevos" | "viejos">("nuevos")
 
   // Edit mode
   const [editMode, setEditMode] = useState(false)
@@ -367,29 +391,21 @@ export default function TicketsActivosPage() {
       setLoading(true)
 
       try {
-        const params = new URLSearchParams()
-        const hasSearchFilters = Boolean(
-          searchTerm ||
-            statusFilter !== "all" ||
-            equipmentFilter !== "all" ||
-            dateFrom ||
-            dateTo
-        )
-        if (hasSearchFilters) params.set("scope", "active")
-        if (searchTerm) params.set("q", searchTerm)
-        // Se filtra en cliente para que "recibido" incluya el alias "received".
-        if (statusFilter !== "all" && statusFilter !== "recibido") {
-          params.set("status", statusFilter)
-        }
-        if (equipmentFilter !== "all") {
-          params.set("equipment_type", equipmentFilter)
-        }
-        if (dateFrom) params.set("date_from", dateFrom)
-        if (dateTo) params.set("date_to", dateTo)
+        const soloActivos =
+          VISTAS.find((v) => v.id === vista)?.soloActivos ?? true
 
-        const url = hasSearchFilters
-          ? `/api/search?${params}`
-          : "/api/tickets?scope=active"
+        let url: string
+        if (searchTerm) {
+          // La busqueda pega contra /api/search; el filtro por vista se aplica
+          // despues, en cliente, para que buscar dentro de "Entregados"
+          // devuelva entregados y no lo que el servidor considere activo.
+          const params = new URLSearchParams({ q: searchTerm })
+          if (soloActivos) params.set("scope", "active")
+          url = `/api/search?${params}`
+        } else {
+          url = soloActivos ? "/api/tickets?scope=active" : "/api/tickets"
+        }
+
         setLoadError(null)
         const response = await fetch(url, { signal: controller.signal })
         if (!response.ok) {
@@ -401,13 +417,17 @@ export default function TicketsActivosPage() {
 
         const parsedTickets = (Array.isArray(data) ? data : [])
           .filter((ticket): ticket is Ticket =>
-            isActiveTicketStatus((ticket as { status?: unknown })?.status)
+            perteneceALaVista(
+              String((ticket as { status?: unknown })?.status ?? ""),
+              vista
+            )
           )
           .map((ticket) => parseTicket(ticket))
-          .filter(
-            (ticket) =>
-              statusFilter === "all" || ticket.status === statusFilter
-          )
+          .sort((a, b) => {
+            const ta = Date.parse(a.created_at) || 0
+            const tb = Date.parse(b.created_at) || 0
+            return orden === "nuevos" ? tb - ta : ta - tb
+          })
 
         setTickets(parsedTickets)
       } catch (error) {
@@ -428,7 +448,7 @@ export default function TicketsActivosPage() {
       clearTimeout(debounce)
       controller.abort()
     }
-  }, [searchTerm, statusFilter, equipmentFilter, dateFrom, dateTo, reintento])
+  }, [searchTerm, vista, orden, reintento])
 
   const handleStatusChange = async (ticketId: string, newStatus: TicketStatus) => {
     if (savingStatusIds.has(ticketId)) return
@@ -465,10 +485,9 @@ export default function TicketsActivosPage() {
       }
 
       setTickets((prev) => {
-        if (
-          !isActiveTicketStatus(newStatus) ||
-          (statusFilter !== "all" && statusFilter !== newStatus)
-        ) {
+        // Si el nuevo estado ya no cae en la vista abierta, el ticket se va de
+        // la lista: dejarlo seria mostrar un entregado dentro de "En taller".
+        if (!perteneceALaVista(newStatus, vista)) {
           return prev.filter((ticket) => ticket.id !== ticketId)
         }
 
@@ -621,14 +640,11 @@ export default function TicketsActivosPage() {
   const formatDate = (dateStr: string) => formatDateOnlyForDisplay(dateStr, "es-MX")
 
   const clearFilters = () => {
-    setStatusFilter("all")
-    setEquipmentFilter("all")
-    setDateFrom("")
-    setDateTo("")
     setSearchTerm("")
+    setVista("activos")
   }
 
-  const hasActiveFilters = statusFilter !== 'all' || equipmentFilter !== 'all' || dateFrom || dateTo
+  const hasActiveFilters = vista !== "activos" 
 
   const displayId = (t: Ticket) =>
     t.ticket_seq != null ? `N° ${t.ticket_seq}` : t.id
@@ -642,112 +658,71 @@ export default function TicketsActivosPage() {
           action={<QRScanner onScan={handleQRScan} />}
         />
 
-        {/* ── Búsqueda y filtros ─────────────────────── */}
-        <Collapsible open={showFilters} onOpenChange={setShowFilters}>
-          <Card>
-            <CardContent className="space-y-4 p-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="Cliente, N° ticket, teléfono o modelo"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="h-11 pl-10"
-                  />
-                </div>
-                <CollapsibleTrigger asChild>
-                  <Button
-                    variant={hasActiveFilters ? "default" : "outline"}
-                    className="h-11 shrink-0 gap-2"
-                  >
-                    <Filter className="h-4 w-4" />
-                    Filtros
-                    {hasActiveFilters && (
-                      <span className="ml-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-background/25 text-[11px] font-semibold">
-                        !
-                      </span>
+        {/* ── Búsqueda, vistas y orden ───────────────── */}
+        <div className="space-y-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Cliente, N° ticket, teléfono o modelo"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-11 pl-10"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Pestañas: las tres preguntas reales, sin panel que desplegar */}
+            <div
+              role="tablist"
+              aria-label="Qué tickets ver"
+              className="flex flex-wrap gap-1 rounded-xl border border-border bg-card p-1"
+            >
+              {VISTAS.map((v) => {
+                const activa = v.id === vista
+                return (
+                  <button
+                    key={v.id}
+                    role="tab"
+                    type="button"
+                    aria-selected={activa}
+                    onClick={() => setVista(v.id)}
+                    className={cn(
+                      "min-h-11 rounded-lg px-3 text-sm transition-colors",
+                      activa
+                        ? "bg-accent font-medium text-accent-foreground"
+                        : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
                     )}
-                  </Button>
-                </CollapsibleTrigger>
-              </div>
+                  >
+                    {v.label}
+                  </button>
+                )
+              })}
+            </div>
 
-              <CollapsibleContent className="space-y-4">
-                <div className="grid gap-4 border-t border-border pt-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="space-y-2">
-                    <Label>Estado</Label>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Todos" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos los activos</SelectItem>
-                        {activeStatusOptions.map(status => (
-                          <SelectItem key={status} value={status}>
-                            {STATUS_LABELS[status]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Tipo de Equipo</Label>
-                    <Select value={equipmentFilter} onValueChange={setEquipmentFilter}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Todos" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        {Object.entries(EQUIPMENT_LABELS).map(([key, label]) => (
-                          <SelectItem key={key} value={key}>{label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-1.5">
-                      <Calendar className="h-3.5 w-3.5" />
-                      Fecha Desde
-                    </Label>
-                    <Input
-                      type="date"
-                      value={dateFrom}
-                      onChange={(e) => setDateFrom(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-1.5">
-                      <Calendar className="h-3.5 w-3.5" />
-                      Fecha Hasta
-                    </Label>
-                    <Input
-                      type="date"
-                      value={dateTo}
-                      onChange={(e) => setDateTo(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {hasActiveFilters && (
-                  <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1.5">
-                    <X className="h-4 w-4" />
-                    Limpiar filtros
-                  </Button>
-                )}
-              </CollapsibleContent>
-            </CardContent>
-          </Card>
-        </Collapsible>
+            <Button
+              variant="outline"
+              className="ml-auto shrink-0 gap-1.5"
+              onClick={() =>
+                setOrden((o) => (o === "nuevos" ? "viejos" : "nuevos"))
+              }
+              aria-label={
+                orden === "nuevos"
+                  ? "Ordenado: primero los más nuevos. Cambiar a más viejos."
+                  : "Ordenado: primero los más viejos. Cambiar a más nuevos."
+              }
+            >
+              <ArrowDownUp className="h-4 w-4" />
+              {orden === "nuevos" ? "Más nuevos" : "Más viejos"}
+            </Button>
+          </div>
+        </div>
 
         {/* ── Resultados ─────────────────────────────── */}
         <section className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="flex items-center gap-2 text-lg font-semibold">
               <ClipboardList className="h-5 w-5 text-primary" />
-              En taller
+              {VISTAS.find((v) => v.id === vista)?.label}
             </h2>
             {!loading && (
               <Badge variant="secondary" className="font-normal">
