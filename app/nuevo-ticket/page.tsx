@@ -108,9 +108,16 @@ export default function NuevoTicketPage() {
   )
   const [diagnosisCost, setDiagnosisCost] = useState("")
 
-  const [tempTicketId] = useState(() => `TKT-${Date.now()}`)
+  // Modelos que ya pasaron por el taller, para no tipear "Pavilion 15" entero
+  const [modelosVistos, setModelosVistos] = useState<
+    { model: string; brand: string | null }[]
+  >([])
+
+  const [tempTicketId, setTempTicketId] = useState(() => `TKT-${Date.now()}`)
   const [saving, setSaving] = useState(false)
   const [savedTicket, setSavedTicket] = useState<Ticket | null>(null)
+  /** Tickets ya creados en esta misma visita del cliente. */
+  const [ticketsDelCliente, setTicketsDelCliente] = useState<Ticket[]>([])
   const [printSettings, setPrintSettings] = useState(() => ({
     id: "default",
     shop_name: "MULTIPLANET",
@@ -179,6 +186,36 @@ export default function NuevoTicketPage() {
     }
   }, [clientPhone])
 
+  // ── Modelos ya vistos para este tipo/marca ──────────────────────────
+  useEffect(() => {
+    if (paso !== 2) return
+    const controller = new AbortController()
+    const debounce = window.setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({
+          equipmentType: equipmentType,
+          limit: "6",
+        })
+        if (brand.trim()) params.set("brand", brand.trim())
+        if (model.trim()) params.set("q", model.trim())
+        const res = await fetch(`/api/tickets/suggestions?${params}`, {
+          signal: controller.signal,
+          cache: "no-store",
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        setModelosVistos(Array.isArray(data?.models) ? data.models : [])
+      } catch {
+        // Sin red o abortado: se escribe a mano, que es lo que se hacia antes.
+        setModelosVistos([])
+      }
+    }, 300)
+    return () => {
+      controller.abort()
+      window.clearTimeout(debounce)
+    }
+  }, [paso, equipmentType, brand, model])
+
   // ── Validacion por paso ─────────────────────────────────────────────
   const telefonoOk = clientPhone.replace(/\D/g, "").length >= 8
   const nombreOk = clientName.trim().length >= 2
@@ -231,11 +268,9 @@ export default function NuevoTicketPage() {
     setPaso(3)
   }
 
-  const resetForm = () => {
-    setPaso(1)
-    setClientPhone("")
-    setClientName("")
-    setCustomerExists(false)
+  /** Deja solo los datos del equipo en blanco; el cliente se conserva. */
+  const limpiarEquipo = () => {
+    setTempTicketId(`TKT-${Date.now()}`)
     setEquipmentType("computadora")
     setBrand("")
     setModel("")
@@ -248,7 +283,22 @@ export default function NuevoTicketPage() {
     setEstimatedDeliveryDate(getTomorrowDateInputValue())
     setDiagnosisCost("")
     setSavedTicket(null)
+  }
+
+  const resetForm = () => {
+    limpiarEquipo()
+    setPaso(1)
+    setClientPhone("")
+    setClientName("")
+    setCustomerExists(false)
+    setTicketsDelCliente([])
     autoFilledCustomerNameRef.current = null
+  }
+
+  /** Mismo cliente, otro equipo: vuelve al paso 2 con el cliente puesto. */
+  const otroEquipoDelMismoCliente = () => {
+    limpiarEquipo()
+    setPaso(2)
   }
 
   const handleSave = async (abrirImpresion: boolean) => {
@@ -307,6 +357,7 @@ export default function NuevoTicketPage() {
             : ticket.photos || [],
       }
       setSavedTicket(parsed)
+      setTicketsDelCliente((prev) => [...prev, parsed])
 
       if (abrirImpresion) {
         fetch("/api/settings")
@@ -366,14 +417,44 @@ export default function NuevoTicketPage() {
                   guardado
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {savedTicket.client_name} · {EQUIPMENT_LABELS[savedTicket.equipment_type]}{" "}
-                  {savedTicket.brand} {savedTicket.model}
+                  {savedTicket.client_name} ·{" "}
+                  {EQUIPMENT_LABELS[savedTicket.equipment_type]} {savedTicket.brand}{" "}
+                  {savedTicket.model}
                 </p>
               </div>
-              <Button onClick={resetForm} size="lg" className="w-full">
-                <PlusCircle className="mr-2 size-5" />
-                Crear otro ticket
-              </Button>
+
+              {/* Si el cliente trajo mas de un equipo, cada uno tiene su
+                  ticket y aca se ven todos los de esta visita. */}
+              {ticketsDelCliente.length > 1 && (
+                <ul className="w-full space-y-1 rounded-2xl border border-border bg-muted/40 px-4 py-3 text-left text-sm">
+                  <li className="pb-1 font-medium">
+                    {ticketsDelCliente.length} equipos de {savedTicket.client_name}
+                  </li>
+                  {ticketsDelCliente.map((t) => (
+                    <li key={t.id} className="text-muted-foreground">
+                      <span className="tabular">
+                        N° {t.ticket_seq ?? t.id}
+                      </span>{" "}
+                      · {EQUIPMENT_LABELS[t.equipment_type]} {t.brand} {t.model}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div className="grid w-full gap-2 sm:grid-cols-2">
+                <Button
+                  onClick={otroEquipoDelMismoCliente}
+                  size="lg"
+                  variant="outline"
+                >
+                  <Package className="mr-2 size-5" />
+                  Otro equipo de {savedTicket.client_name.split(" ")[0]}
+                </Button>
+                <Button onClick={resetForm} size="lg">
+                  <PlusCircle className="mr-2 size-5" />
+                  Otro cliente
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -399,8 +480,23 @@ export default function NuevoTicketPage() {
       <div className="mx-auto max-w-3xl space-y-6">
         <PageHeader
           title="Nuevo ticket"
-          description={`Paso ${paso} de 3 · ${PASOS[paso - 1].titulo}`}
+          description={
+            paso > 1 && clientName
+              ? `${clientName} · Paso ${paso} de 3 · ${PASOS[paso - 1].titulo}`
+              : `Paso ${paso} de 3 · ${PASOS[paso - 1].titulo}`
+          }
         />
+
+        {/* Segundo equipo en adelante: se recuerda lo que ya se recibio */}
+        {ticketsDelCliente.length > 0 && paso > 1 && (
+          <p className="text-sm text-muted-foreground">
+            Equipo {ticketsDelCliente.length + 1} de esta visita. Ya se recibió{" "}
+            {ticketsDelCliente
+              .map((t) => `${EQUIPMENT_LABELS[t.equipment_type]} ${t.brand}`.trim())
+              .join(", ")}
+            .
+          </p>
+        )}
 
         {/* ── Indicador de pasos ─────────────────────────── */}
         <ol className="flex items-center gap-2" aria-label="Progreso">
@@ -441,7 +537,24 @@ export default function NuevoTicketPage() {
         {/* ══ PASO 1 — CLIENTE ═══════════════════════════════ */}
         {paso === 1 && (
           <Card>
-            <CardContent className="space-y-5 pt-6">
+            <CardContent className="pt-6">
+              <form
+                className="space-y-5"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  if (paso1Ok) setPaso(2)
+                }}
+              onKeyDown={(e) => {
+                  // Enter avanza desde cualquier campo de una linea. No se
+                  // confia en el envio implicito del navegador, que no se
+                  // disparo de forma fiable aca. En el textarea Enter sigue
+                  // siendo salto de linea.
+                  if (e.key !== "Enter") return
+                  if (e.target instanceof HTMLTextAreaElement) return
+                  e.preventDefault()
+                  e.currentTarget.requestSubmit()
+                }}
+              >
               <div className="space-y-2">
                 <Label htmlFor="recibio">Recibió en taller</Label>
                 <Input
@@ -493,11 +606,12 @@ export default function NuevoTicketPage() {
               )}
 
               <div className="flex justify-end pt-1">
-                <Button size="lg" disabled={!paso1Ok} onClick={() => setPaso(2)}>
+                <Button type="submit" size="lg" disabled={!paso1Ok}>
                   Siguiente
                   <ArrowRight className="ml-2 size-5" />
                 </Button>
               </div>
+              </form>
             </CardContent>
           </Card>
         )}
@@ -505,7 +619,24 @@ export default function NuevoTicketPage() {
         {/* ══ PASO 2 — EQUIPO ════════════════════════════════ */}
         {paso === 2 && (
           <Card>
-            <CardContent className="space-y-5 pt-6">
+            <CardContent className="pt-6">
+              <form
+                className="space-y-5"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  irAlPaso3()
+                }}
+              onKeyDown={(e) => {
+                  // Enter avanza desde cualquier campo de una linea. No se
+                  // confia en el envio implicito del navegador, que no se
+                  // disparo de forma fiable aca. En el textarea Enter sigue
+                  // siendo salto de linea.
+                  if (e.key !== "Enter") return
+                  if (e.target instanceof HTMLTextAreaElement) return
+                  e.preventDefault()
+                  e.currentTarget.requestSubmit()
+                }}
+              >
               <div className="space-y-2">
                 <Label htmlFor="tipo">Tipo de equipo</Label>
                 <Select
@@ -567,6 +698,25 @@ export default function NuevoTicketPage() {
                 </div>
               )}
 
+              {modelosVistos.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {modelosVistos.map((m) => (
+                    <Button
+                      key={`${m.brand}|${m.model}`}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (m.brand) setBrand(m.brand)
+                        setModel(m.model)
+                      }}
+                    >
+                      {m.brand ? `${m.brand} ${m.model}` : m.model}
+                    </Button>
+                  ))}
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="problema">Problema reportado</Label>
                 <Textarea
@@ -597,15 +747,21 @@ export default function NuevoTicketPage() {
               </div>
 
               <div className="flex items-center justify-between gap-3 pt-1">
-                <Button variant="outline" size="lg" onClick={() => setPaso(1)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  onClick={() => setPaso(1)}
+                >
                   <ArrowLeft className="mr-2 size-5" />
                   Atrás
                 </Button>
-                <Button size="lg" disabled={!paso2Ok} onClick={irAlPaso3}>
+                <Button type="submit" size="lg" disabled={!paso2Ok}>
                   Siguiente
                   <ArrowRight className="ml-2 size-5" />
                 </Button>
               </div>
+              </form>
             </CardContent>
           </Card>
         )}
