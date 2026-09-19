@@ -54,6 +54,7 @@ import {
   Tag,
   Image as ImageIcon,
   ClipboardList,
+  SearchX,
   Smartphone,
   X,
   Pencil,
@@ -67,6 +68,9 @@ import { buildTicketWhatsAppTemplates } from "@/lib/whatsapp"
 import { formatDateOnlyForDisplay } from "@/lib/date-utils"
 import { StatusPill, statusBase } from "@/components/status-pill"
 import { toast } from "sonner"
+import Link from "next/link"
+import { EstadoError, EstadoVacio } from "@/components/estado-lista"
+import { mensajeDeError } from "@/lib/fetch-lista"
 
 const statusOptions: TicketStatus[] = [
   "recibido",
@@ -317,6 +321,8 @@ export default function TicketsActivosPage() {
   const [showCustomerPrint, setShowCustomerPrint] = useState(false)
   const [showInternalPrint, setShowInternalPrint] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [reintento, setReintento] = useState(0)
   const [showFilters, setShowFilters] = useState(false)
   const [savingStatusIds, setSavingStatusIds] = useState<Set<string>>(
     () => new Set()
@@ -384,6 +390,7 @@ export default function TicketsActivosPage() {
         const url = hasSearchFilters
           ? `/api/search?${params}`
           : "/api/tickets?scope=active"
+        setLoadError(null)
         const response = await fetch(url, { signal: controller.signal })
         if (!response.ok) {
           throw new Error(`No se pudieron cargar los tickets (${response.status})`)
@@ -408,6 +415,8 @@ export default function TicketsActivosPage() {
           return
         }
         console.error("Error fetching tickets:", error)
+        setLoadError(mensajeDeError(error))
+        setTickets([])
       } finally {
         if (requestId === ticketsRequestIdRef.current) {
           setLoading(false)
@@ -419,7 +428,7 @@ export default function TicketsActivosPage() {
       clearTimeout(debounce)
       controller.abort()
     }
-  }, [searchTerm, statusFilter, equipmentFilter, dateFrom, dateTo])
+  }, [searchTerm, statusFilter, equipmentFilter, dateFrom, dateTo, reintento])
 
   const handleStatusChange = async (ticketId: string, newStatus: TicketStatus) => {
     if (savingStatusIds.has(ticketId)) return
@@ -761,24 +770,38 @@ export default function TicketsActivosPage() {
                 ))}
               </CardContent>
             </Card>
+          ) : loadError ? (
+            <EstadoError
+              mensaje={loadError}
+              onReintentar={() => setReintento((n) => n + 1)}
+            />
           ) : tickets.length === 0 ? (
-            <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-card py-16 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
-                <Search className="h-8 w-8 text-primary" />
-              </div>
-              <div>
-                <p className="font-medium">No se encontraron tickets</p>
-                <p className="text-sm text-muted-foreground">
-                  Ajusta la búsqueda o limpia los filtros para ver más resultados.
-                </p>
-              </div>
-              {hasActiveFilters && (
-                <Button variant="outline" onClick={clearFilters} className="gap-1.5">
-                  <X className="h-4 w-4" />
-                  Limpiar filtros
-                </Button>
-              )}
-            </div>
+            /* Dos mensajes distintos a proposito: "no hay tickets" cuando en
+               realidad el filtro no encontro nada es un bug de comunicacion. */
+            hasActiveFilters || searchTerm ? (
+              <EstadoVacio
+                icon={SearchX}
+                titulo="Sin coincidencias"
+                detalle="Ningun ticket activo coincide con la busqueda o los filtros."
+                accion={
+                  <Button variant="outline" onClick={clearFilters} className="gap-1.5">
+                    <X className="h-4 w-4" />
+                    Limpiar filtros
+                  </Button>
+                }
+              />
+            ) : (
+              <EstadoVacio
+                icon={ClipboardList}
+                titulo="No hay equipos en taller"
+                detalle="Cuando recibas un equipo, el ticket aparece aca."
+                accion={
+                  <Button asChild>
+                    <Link href="/nuevo-ticket">Crear el primero</Link>
+                  </Button>
+                }
+              />
+            )
           ) : (
             <>
               <div className="grid gap-3 md:hidden">
