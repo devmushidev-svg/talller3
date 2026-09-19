@@ -83,3 +83,39 @@ export function PaymentPill({
 export function statusBase(status: TicketStatus) {
   return STATUS_TOKENS[status].base
 }
+
+/**
+ * La API tambien devuelve alias en ingles y estados terminales que no estan
+ * en TicketStatus. Se mapean a los MISMOS tokens en vez de inventar una sexta
+ * paleta, y lo desconocido cae en neutro: un color inventado para un estado
+ * que no entendemos es peor que ningun color.
+ */
+const ALIAS: Record<string, { base: string; fg: string }> = {
+  received: STATUS_TOKENS.recibido,
+  delivered: STATUS_TOKENS.entregado,
+  completed: STATUS_TOKENS.listo,
+  cerrado: STATUS_TOKENS.entregado,
+  cancelado: { base: 'var(--danger)', fg: 'var(--danger-fg)' },
+  canceled: { base: 'var(--danger)', fg: 'var(--danger-fg)' },
+  cancelled: { base: 'var(--danger)', fg: 'var(--danger-fg)' },
+  anulado: { base: 'var(--danger)', fg: 'var(--danger-fg)' },
+  desactivado: { base: 'var(--danger)', fg: 'var(--danger-fg)' },
+  inactivo: { base: 'var(--danger)', fg: 'var(--danger-fg)' },
+}
+
+const NEUTRO = { base: 'var(--st-entregado)', fg: 'var(--st-entregado-fg)' }
+
+/** Pildora para un estado que llega como texto libre desde la API. */
+export function EstadoLibrePill({
+  status,
+  label,
+  className,
+}: {
+  status: string
+  label: string
+  className?: string
+}) {
+  const t =
+    STATUS_TOKENS[status as TicketStatus] ?? ALIAS[status] ?? NEUTRO
+  return <Pill base={t.base} fg={t.fg} label={label} className={className} />
+}

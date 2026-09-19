@@ -124,7 +124,7 @@ export default function InventarioPage() {
   })
 
   const totalUnits = parts.reduce((sum, p) => sum + (p.quantity || 0), 0)
-  const categoriesInUse = new Set(parts.map((p) => p.category)).size
+  const lowStockParts = parts.filter((part) => (part.quantity || 0) <= 2).length
 
   const handleOpenDialog = (part?: Part) => {
     if (part) {
@@ -189,33 +189,6 @@ export default function InventarioPage() {
     }
   }
 
-  const statCards = [
-    {
-      title: "Piezas distintas",
-      value: parts.length,
-      icon: Package,
-      tint: "var(--chart-1)",
-    },
-    {
-      title: "Unidades en stock",
-      value: totalUnits,
-      icon: Boxes,
-      tint: "var(--chart-2)",
-    },
-    {
-      title: "Categorías activas",
-      value: categoriesInUse,
-      icon: Layers,
-      tint: "var(--warning)",
-    },
-    {
-      title: "Resultados visibles",
-      value: filteredParts.length,
-      icon: Tag,
-      tint: "var(--success)",
-    },
-  ]
-
   return (
     <DashboardLayout>
       <div className="space-y-8">
@@ -231,42 +204,35 @@ export default function InventarioPage() {
         />
 
         {/* ── Métricas ───────────────────────────── */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          {statCards.map((c) => (
-            <div
-              key={c.title}
-              className="relative overflow-hidden rounded-2xl border border-border bg-card p-4 sm:p-5"
-            >
-              <div
-                className="absolute -right-6 -top-6 h-20 w-20 rounded-full opacity-[0.12]"
-                style={{ background: c.tint }}
-                aria-hidden
-              />
-              <div className="flex items-center gap-3">
-                <span
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
-                  style={{
-                    backgroundColor: `color-mix(in oklch, ${c.tint} 15%, transparent)`,
-                    color: c.tint,
-                  }}
-                >
-                  <c.icon className="h-5 w-5" />
-                </span>
-                <div className="min-w-0">
-                  {loading ? (
-                    <div className="h-7 w-10 rounded-md shimmer" />
-                  ) : (
-                    <p className="text-2xl font-bold leading-none tabular-nums">
-                      {c.value}
-                    </p>
-                  )}
-                  <p className="mt-1 truncate text-xs text-muted-foreground">
-                    {c.title}
-                  </p>
-                </div>
-              </div>
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="flex items-start gap-4">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+              <Package className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm text-muted-foreground">Piezas por reponer</p>
+              {loading ? (
+                <div className="mt-2 h-10 w-16 rounded-md shimmer" />
+              ) : (
+                <p className="mt-1 text-4xl font-semibold leading-none tabular-nums">
+                  {lowStockParts}
+                </p>
+              )}
+              <p className="mt-2 text-xs text-muted-foreground">
+                con 2 unidades o menos
+              </p>
             </div>
-          ))}
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-border pt-3 text-sm">
+            <span>
+              <span className="font-medium tabular-nums">{loading ? "—" : totalUnits}</span>{" "}
+              <span className="text-muted-foreground">unidades en stock</span>
+            </span>
+            <span>
+              <span className="font-medium tabular-nums">{loading ? "—" : parts.length}</span>{" "}
+              <span className="text-muted-foreground">piezas distintas</span>
+            </span>
+          </div>
         </div>
 
         {/* ── Filtros ───────────────────────────── */}

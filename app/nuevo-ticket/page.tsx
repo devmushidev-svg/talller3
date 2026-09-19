@@ -10,6 +10,11 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -444,21 +449,33 @@ export default function NuevoTicketPage() {
 
         {/* Ayuda de navegación por teclado */}
         {!savedTicket && (
-          <div className="flex items-start gap-3 rounded-2xl border border-border bg-muted p-4 text-sm">
-            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-card text-primary shadow-sm">
-              <Keyboard className="h-5 w-5" />
-            </span>
-            <p className="leading-relaxed text-muted-foreground">
-              <kbd className="rounded border bg-card px-1.5 py-0.5 text-xs font-medium text-foreground">Enter</kbd>{" "}
-              para moverse entre campos hasta <strong className="text-foreground">Problema</strong>.
-              Las flechas siguen disponibles para mover el cursor y recorrer sugerencias. {" "}
-              En <strong className="text-foreground">Accesorios</strong> use el ratón (y el botón
-              imprimir). En el cuadro de texto:{" "}
-              <kbd className="rounded border bg-card px-1.5 py-0.5 text-xs font-medium text-foreground">Shift</kbd>{" "}
-              + <kbd className="rounded border bg-card px-1.5 py-0.5 text-xs font-medium text-foreground">Enter</kbd>{" "}
-              para nueva línea.
-            </p>
-          </div>
+          <Collapsible className="overflow-hidden rounded-2xl border border-border bg-muted text-sm">
+            <CollapsibleTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-auto min-h-11 w-full justify-between rounded-2xl px-4 py-3 text-left"
+              >
+                <span className="flex items-center gap-3">
+                  <Keyboard className="h-5 w-5 text-muted-foreground" />
+                  <span>Atajos de teclado</span>
+                </span>
+                <span className="text-xs text-muted-foreground">¿Cómo se usa?</span>
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <p className="border-t border-border px-4 py-3 leading-relaxed text-muted-foreground">
+                <kbd className="rounded border border-input bg-card px-1.5 py-0.5 text-xs font-medium text-foreground">Enter</kbd>{" "}
+                para moverse entre campos hasta <strong className="text-foreground">Problema</strong>.
+                Las flechas siguen disponibles para mover el cursor y recorrer sugerencias. {" "}
+                En <strong className="text-foreground">Accesorios</strong> use el ratón (y el botón
+                imprimir). En el cuadro de texto:{" "}
+                <kbd className="rounded border border-input bg-card px-1.5 py-0.5 text-xs font-medium text-foreground">Shift</kbd>{" "}
+                + <kbd className="rounded border border-input bg-card px-1.5 py-0.5 text-xs font-medium text-foreground">Enter</kbd>{" "}
+                para nueva línea.
+              </p>
+            </CollapsibleContent>
+          </Collapsible>
         )}
 
         <div className="space-y-6">
@@ -522,7 +539,7 @@ export default function NuevoTicketPage() {
 
               {/* Customer history button */}
               {customerExists && clientPhone && (
-                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-muted/40 px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-muted/40 px-4 py-3">
                   <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
                     <CheckCircle2 className="h-4 w-4 text-[var(--success)]" />
                     Cliente existente
@@ -563,7 +580,7 @@ export default function NuevoTicketPage() {
                         variant="outline"
                         aria-pressed={isActive}
                         onClick={() => handleApplyTemplate(template)}
-                        className={`h-auto min-h-16 justify-start whitespace-normal rounded-xl px-3 py-3 text-left ${
+                        className={`h-auto min-h-16 justify-start whitespace-normal rounded-2xl px-3 py-3 text-left ${
                           isActive
                             ? "border-primary bg-primary/10 text-foreground ring-1 ring-primary/20"
                             : "border-border bg-card"
@@ -662,7 +679,7 @@ export default function NuevoTicketPage() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-border bg-muted/25 p-3">
+              <div className="rounded-2xl border border-border bg-muted/25 p-3">
                 <div className="flex min-h-5 items-center justify-between gap-3">
                   <p
                     id="modelSuggestionsHelp"
@@ -692,7 +709,7 @@ export default function NuevoTicketPage() {
                             type="button"
                             variant="outline"
                             onClick={() => handleModelSuggestion(suggestion)}
-                            className="h-auto min-h-11 w-full min-w-0 justify-start whitespace-normal rounded-lg bg-card px-3 py-2 text-left"
+                            className="h-auto min-h-11 w-full min-w-0 justify-start whitespace-normal rounded-2xl bg-card px-3 py-2 text-left"
                             aria-label={`Usar modelo ${suggestion.model}${
                               suggestion.brand ? `, marca ${suggestion.brand}` : ""
                             }`}
@@ -794,9 +811,9 @@ export default function NuevoTicketPage() {
                     <Label
                       key={accessory}
                       htmlFor={accessory}
-                      className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm transition-colors ${
+                      className={`flex min-h-11 cursor-pointer items-center gap-2.5 rounded-2xl border px-3 py-2.5 text-sm transition-colors ${
                         checked
-                          ? "border-primary/40 bg-primary/5 text-foreground"
+                          ? "border-input bg-accent text-foreground"
                           : "border-border bg-card text-muted-foreground hover:bg-muted/40"
                       }`}
                     >
@@ -848,14 +865,14 @@ export default function NuevoTicketPage() {
                       .map((item) => (
                         <li
                           key={item}
-                          className="flex items-start justify-between gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2"
+                          className="flex min-h-11 items-start justify-between gap-2 rounded-2xl border border-border bg-muted/40 px-3 py-2"
                         >
                           <span>{item}</span>
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 shrink-0"
+                            className="size-11 shrink-0"
                             onClick={() => removeAccessory(item)}
                             aria-label="Quitar"
                           >

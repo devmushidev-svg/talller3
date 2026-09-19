@@ -25,6 +25,7 @@ import {
   ArrowRight,
   Wallet,
   CalendarClock,
+  AlertTriangle,
 } from "lucide-react"
 import {
   Ticket,
@@ -40,6 +41,8 @@ import { ScrollSafeLink } from "@/components/scroll-safe-link"
 import { GlobalTicketSearch } from "@/components/global-ticket-search"
 import { buildTicketWhatsAppTemplates } from "@/lib/whatsapp"
 import { toast } from "sonner"
+import { EstadoError } from "@/components/estado-lista"
+import { fetchLista, mensajeDeError } from "@/lib/fetch-lista"
 
 function parseTicket(t: Ticket): Ticket {
   return {
@@ -81,40 +84,60 @@ export default function DashboardPage() {
   const [ticketsLoading, setTicketsLoading] = useState(true)
   const [statusSavingId, setStatusSavingId] = useState<string | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
+  const [ticketsError, setTicketsError] = useState<string | null>(null)
+  const [statsError, setStatsError] = useState<string | null>(null)
+  const [reintento, setReintento] = useState(0)
 
   useEffect(() => {
     let cancelled = false
-    fetch("/api/tickets?scope=active&limit=8")
-      .then((res) => res.json())
+    setTicketsLoading(true)
+    setTicketsError(null)
+    fetchLista<Ticket>("/api/tickets?scope=active&limit=8")
       .then((data) => {
         if (cancelled) return
-        const list = Array.isArray(data)
-          ? data.map((t: Ticket) => parseTicket(t)).filter((t: Ticket) => t.status !== "entregado")
-          : []
-        setTickets(list)
+        setTickets(
+          data.map((t) => parseTicket(t)).filter((t) => t.status !== "entregado")
+        )
       })
-      .catch(console.error)
+      .catch((e) => {
+        if (cancelled) return
+        console.error(e)
+        // Un 500 no es "no hay tickets". Decirlo asi seria mentir.
+        setTicketsError(mensajeDeError(e))
+        setTickets([])
+      })
       .finally(() => {
         if (!cancelled) setTicketsLoading(false)
       })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [reintento])
 
   useEffect(() => {
     let cancelled = false
+    setStatsError(null)
     fetch("/api/stats")
-      .then((res) => res.json())
-      .then((data) => {
-        if (cancelled || data?.error) return
-        setStats(data as Stats)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`El servidor respondió ${res.status}.`)
+        const data = await res.json()
+        if (data?.error) throw new Error(String(data.error))
+        return data as Stats
       })
-      .catch(console.error)
+      .then((data) => {
+        if (!cancelled) setStats(data)
+      })
+      .catch((e) => {
+        if (cancelled) return
+        console.error(e)
+        // Sin esto, las tarjetas se quedaban en esqueleto de carga para
+        // siempre: parecia que seguia cargando y en realidad habia fallado.
+        setStatsError(mensajeDeError(e))
+      })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [reintento])
 
   const handleStatusChange = async (ticketId: string, newStatus: TicketStatus) => {
     setStatusSavingId(ticketId)
@@ -217,7 +240,13 @@ export default function DashboardPage() {
             >
               <p className="text-sm text-muted-foreground">{c.title}</p>
               {c.value == null ? (
-                <div className="mt-2 h-10 w-16 rounded-md shimmer" />
+                statsError ? (
+                  <p className="mt-1 text-4xl font-semibold leading-none text-muted-foreground">
+                    —
+                  </p>
+                ) : (
+                  <div className="mt-2 h-10 w-16 rounded-md shimmer" />
+                )
               ) : (
                 <p className="mt-1 text-4xl font-semibold leading-none tabular">
                   {c.value}
@@ -232,6 +261,30 @@ export default function DashboardPage() {
         </div>
 
         {/* Contexto del dia: una linea, no tres tarjetas */}
+        {statsError ? (
+          <div
+            role="alert"
+            className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-border bg-card px-5 py-3.5 text-sm"
+          >
+            <span className="flex items-center gap-2 font-medium">
+              <AlertTriangle
+                className="size-4 shrink-0"
+                style={{ color: "var(--danger)" }}
+                aria-hidden
+              />
+              No se pudieron cargar las cifras
+            </span>
+            <span className="text-muted-foreground">{statsError}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-auto"
+              onClick={() => setReintento((n) => n + 1)}
+            >
+              Reintentar
+            </Button>
+          </div>
+        ) : (
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl border border-border bg-card px-5 py-3.5 text-sm">
           {hoy.map((c) => (
             <span key={c.title} className="flex items-baseline gap-1.5">
@@ -257,6 +310,7 @@ export default function DashboardPage() {
             </span>
           )}
         </div>
+        )}
 
         {/* ── Tickets en taller ──────────────────────── */}
         <section className="space-y-4">
@@ -299,6 +353,11 @@ export default function DashboardPage() {
                 </div>
               ))}
             </div>
+          ) : ticketsError ? (
+            <EstadoError
+              mensaje={ticketsError}
+              onReintentar={() => setReintento((n) => n + 1)}
+            />
           ) : tickets.length === 0 ? (
             <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-card py-16 text-center">
               <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">

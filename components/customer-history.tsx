@@ -106,14 +106,14 @@ export function CustomerHistory({ phone, name }: CustomerHistoryProps) {
               </Card>
               <Card>
                 <CardContent className="p-3 text-center">
-                  <History className="h-5 w-5 mx-auto text-green-600 mb-1" />
+                  <History className="mx-auto mb-1 h-5 w-5 text-muted-foreground" />
                   <p className="text-2xl font-bold">{data.summary.completedTickets}</p>
                   <p className="text-xs text-muted-foreground">Completados</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-3 text-center">
-                  <DollarSign className="h-5 w-5 mx-auto text-blue-600 mb-1" />
+                  <DollarSign className="mx-auto mb-1 h-5 w-5 text-muted-foreground" />
                   <p className="text-2xl font-bold">${data.summary.totalSpent.toFixed(0)}</p>
                   <p className="text-xs text-muted-foreground">Total Gastado</p>
                 </CardContent>
@@ -148,7 +148,7 @@ export function CustomerHistory({ phone, name }: CustomerHistoryProps) {
                           </p>
                         </div>
                         {(ticket.total_cost ?? 0) > 0 && (
-                          <span className="font-medium text-green-600">
+                          <span className="font-medium text-foreground">
                             L. {(ticket.total_cost ?? 0).toFixed(2)}
                           </span>
                         )}

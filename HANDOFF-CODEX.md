@@ -1,5 +1,10 @@
 # Brief para Codex — rediseño de UI de Multiplanet
 
+> **Estado: los cuatro lotes están terminados y verificados.** Este documento
+> se conserva como referencia de la dirección, los tokens y las reglas. Si
+> volvés a abrirlo para trabajo nuevo, releé la sección 6 (cómo verificar):
+> las tres trampas que describe se repitieron y cuestan tiempo.
+
 Rama: `rediseno-ui`. Commits base: `dc3ce61` (tokens) y `8d87919` (estados de error).
 **Leé esto entero antes de tocar un archivo.** Está escrito para que puedas trabajar
 sin haber visto la conversación donde se decidió todo.

@@ -133,17 +133,10 @@ export default function ConfiguracionPage() {
 
         <div className="space-y-6">
           {/* ── Datos del taller ───────────────────────── */}
-          <Card>
+          <Card className="border-border">
             <CardHeader>
               <div className="flex items-center gap-3">
-                <span
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
-                  style={{
-                    backgroundColor:
-                      "color-mix(in oklch, var(--chart-1) 15%, transparent)",
-                    color: "var(--chart-1)",
-                  }}
-                >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
                   <Store className="h-5 w-5" />
                 </span>
                 <div className="space-y-0.5">
@@ -201,17 +194,10 @@ export default function ConfiguracionPage() {
           </Card>
 
           {/* ── Impresora ──────────────────────────────── */}
-          <Card>
+          <Card className="border-border">
             <CardHeader>
               <div className="flex items-center gap-3">
-                <span
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
-                  style={{
-                    backgroundColor:
-                      "color-mix(in oklch, var(--chart-2) 15%, transparent)",
-                    color: "var(--chart-2)",
-                  }}
-                >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
                   <Printer className="h-5 w-5" />
                 </span>
                 <div className="space-y-0.5">

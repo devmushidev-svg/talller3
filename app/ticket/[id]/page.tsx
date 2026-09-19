@@ -30,11 +30,21 @@ import { Spinner } from "@/components/ui/spinner"
 import { buildTicketWhatsAppTemplates } from "@/lib/whatsapp"
 import { formatDateOnlyForDisplay } from "@/lib/date-utils"
 import { EQUIPMENT_LABELS, type EquipmentType, type Ticket } from "@/lib/types"
+import { EstadoLibrePill } from "@/components/status-pill"
+
+/** Marca un fallo del servidor para distinguirlo de "el ticket no existe". */
+class FalloDeCarga extends Error {}
 
 const fetcher = async (url: string): Promise<Ticket> => {
   const response = await fetch(url, { cache: "no-store" })
   const payload: unknown = await response.json().catch(() => null)
 
+  // 404 es "no existe". 500 es "no se pudo preguntar". Decirle al usuario
+  // que su ticket "puede haber sido eliminado" cuando lo que fallo fue el
+  // servidor es mentirle sobre sus propios datos.
+  if (response.status >= 500) {
+    throw new FalloDeCarga(`El servidor respondió ${response.status}.`)
+  }
   if (!response.ok || !payload || typeof payload !== "object") {
     throw new Error("Ticket no encontrado")
   }
@@ -45,21 +55,6 @@ const fetcher = async (url: string): Promise<Ticket> => {
     accessories: parseStringList(ticket.accessories),
     photos: parseStringList(ticket.photos).filter(isSafeHttpUrl),
   }
-}
-
-const STATUS_STYLES: Record<string, string> = {
-  recibido: "border-border bg-primary/10 text-primary",
-  received: "border-border bg-primary/10 text-primary",
-  en_diagnostico: "border-warning/30 bg-warning/15 text-foreground",
-  en_reparacion: "border-accent/30 bg-accent/15 text-accent-foreground",
-  listo: "border-success/30 bg-success/15 text-success",
-  entregado: "border-border bg-muted text-muted-foreground",
-  delivered: "border-border bg-muted text-muted-foreground",
-  cerrado: "border-border bg-muted text-muted-foreground",
-  cancelado: "border-destructive/30 bg-destructive/10 text-destructive",
-  canceled: "border-destructive/30 bg-destructive/10 text-destructive",
-  desactivado: "border-destructive/30 bg-destructive/10 text-destructive",
-  inactivo: "border-destructive/30 bg-destructive/10 text-destructive",
 }
 
 const STATUS_LABELS_SAFE: Record<string, string> = {
@@ -140,7 +135,7 @@ export default function TicketDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = use(params)
-  const { data: ticket, isLoading, error } = useSWR<Ticket>(
+  const { data: ticket, isLoading, error, mutate } = useSWR<Ticket>(
     `/api/tickets/${encodeURIComponent(id)}`,
     fetcher,
     { revalidateOnFocus: false }
@@ -160,6 +155,7 @@ export default function TicketDetailPage({
   }
 
   if (error || !ticket) {
+    const falloServidor = error instanceof FalloDeCarga
     return (
       <DashboardLayout>
         <Card className="mx-auto max-w-lg">
@@ -167,16 +163,25 @@ export default function TicketDetailPage({
             <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
               <ClipboardList className="size-7" />
             </div>
-            <h1 className="text-xl font-semibold">Ticket no encontrado</h1>
+            <h1 className="text-xl font-semibold">
+              {falloServidor ? "No se pudo cargar el ticket" : "Ticket no encontrado"}
+            </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Puede que haya sido eliminado o que el enlace esté incompleto.
+              {falloServidor
+                ? `${error.message} El ticket sigue ahí; fue la consulta la que falló.`
+                : "Puede que haya sido eliminado o que el enlace esté incompleto."}
             </p>
-            <Button asChild variant="outline" className="mt-6">
-              <Link href="/">
-                <ArrowLeft className="mr-2 size-4" />
-                Volver al inicio
-              </Link>
-            </Button>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+              {falloServidor && (
+                <Button onClick={() => mutate()}>Reintentar</Button>
+              )}
+              <Button asChild variant="outline">
+                <Link href="/">
+                  <ArrowLeft className="mr-2 size-4" />
+                  Volver al inicio
+                </Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </DashboardLayout>
@@ -235,12 +240,7 @@ export default function TicketDetailPage({
         />
 
         <div className="flex flex-wrap items-center gap-2">
-          <Badge
-            variant="outline"
-            className={STATUS_STYLES[ticketStatus] ?? "border-border bg-secondary text-secondary-foreground"}
-          >
-            {statusLabel}
-          </Badge>
+          <EstadoLibrePill status={ticketStatus} label={statusLabel} />
           <Badge variant="secondary">{equipmentLabel}</Badge>
           <span className="font-mono text-xs text-muted-foreground">ID: {ticket.id}</span>
         </div>

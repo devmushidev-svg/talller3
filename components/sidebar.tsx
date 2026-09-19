@@ -52,7 +52,10 @@ function Brand({ compact = false }: { compact?: boolean }) {
         alt=""
         width={36}
         height={36}
-        className={cn('shrink-0 rounded-lg bg-white object-contain p-0.5', compact ? 'size-8' : 'size-9')}
+        // El logo es un circulo blanco con la palabra en negro y las esquinas
+        // transparentes. bg-white no es color decorativo: es la placa que hace
+        // juego con el propio asset, y rounded-full la hace invisible.
+        className={cn('shrink-0 rounded-full bg-white object-contain', compact ? 'size-8' : 'size-9')}
       />
       <div className="min-w-0">
         <p
