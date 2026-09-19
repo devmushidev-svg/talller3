@@ -127,6 +127,21 @@ export const PAYMENT_STATUS_COLORS: Record<PaymentStatus, string> = {
   pagado: 'bg-success text-success-foreground'
 }
 
+/**
+ * Tipos que se pueden ELEGIR al recibir un equipo.
+ *
+ * 'laptop' sigue existiendo en EquipmentType y en EQUIPMENT_LABELS a proposito:
+ * hay tickets viejos guardados con ese valor y tienen que seguir mostrandose.
+ * Lo que se quita es la opcion de elegirlo en tickets nuevos, porque en la
+ * practica una laptop se recibe como computadora.
+ */
+export const EQUIPMENT_PICKER_TYPES: readonly EquipmentType[] = [
+  'computadora',
+  'impresora',
+  'monitor',
+  'otro'
+]
+
 export const EQUIPMENT_LABELS: Record<EquipmentType, string> = {
   impresora: 'Impresora',
   computadora: 'Computadora',
@@ -135,11 +150,14 @@ export const EQUIPMENT_LABELS: Record<EquipmentType, string> = {
   otro: 'Otro'
 }
 
-/** Checkboxes en nuevo ticket e impresión orden de trabajo */
+/**
+ * Checkboxes en nuevo ticket e impresión orden de trabajo.
+ * El orden importa: los tres primeros son los que se marcan casi siempre.
+ */
 export const ACCESSORY_CHECKBOX_LABELS = [
-  'Cable de poder',
-  'Cable USB',
   'Cargador',
+  'Cable USB',
+  'Cable de poder',
   'Mouse',
   'Teclado',
   'Funda',
