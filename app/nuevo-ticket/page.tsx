@@ -75,6 +75,62 @@ import { toast } from "sonner"
  * sin marcar no debe frenar a alguien con un cliente esperando enfrente.
  */
 
+/**
+ * Enter avanza al siguiente campo; en el ultimo, pasa de paso.
+ *
+ * Reemplaza las ~80 lineas de refs encadenadas que tenia la version vieja:
+ * aca el orden es una lista de ids y los campos que no estan en pantalla
+ * (la contrasena en una impresora) se saltan solos.
+ *
+ * Excepciones a proposito:
+ * · Shift+Enter en el area de texto escribe un salto de linea.
+ * · Enter sobre el selector abre su menu, que es lo que se espera de el.
+ */
+function avanzarConEnter(
+  e: React.KeyboardEvent<HTMLFormElement>,
+  orden: readonly string[]
+) {
+  if (e.key !== "Enter") return
+
+  const actual = e.target as HTMLElement | null
+  if (!actual) return
+  if (e.shiftKey && actual instanceof HTMLTextAreaElement) return
+  if (actual.getAttribute("role") === "combobox") return
+
+  e.preventDefault()
+
+  const i = orden.indexOf(actual.id)
+  const siguiente =
+    i === -1
+      ? null
+      : orden
+          .slice(i + 1)
+          .map((id) => document.getElementById(id))
+          .find((el): el is HTMLElement => el !== null)
+
+  if (!siguiente) {
+    e.currentTarget.requestSubmit()
+    return
+  }
+
+  siguiente.focus()
+  // Seleccionar el contenido deja escribir encima sin borrar antes. En date
+  // y number select() no aplica y algunos navegadores lanzan.
+  if (
+    siguiente instanceof HTMLInputElement &&
+    !["date", "number"].includes(siguiente.type)
+  ) {
+    try {
+      siguiente.select()
+    } catch {
+      /* no-op */
+    }
+  }
+}
+
+const ORDEN_PASO_1 = ["recibio", "telefono", "nombre"] as const
+const ORDEN_PASO_2 = ["tipo", "marca", "modelo", "clave", "problema"] as const
+
 const PASOS = [
   { n: 1, titulo: "Cliente", icon: User },
   { n: 2, titulo: "Equipo", icon: Package },
@@ -544,21 +600,13 @@ export default function NuevoTicketPage() {
                   e.preventDefault()
                   if (paso1Ok) setPaso(2)
                 }}
-              onKeyDown={(e) => {
-                  // Enter avanza desde cualquier campo de una linea. No se
-                  // confia en el envio implicito del navegador, que no se
-                  // disparo de forma fiable aca. En el textarea Enter sigue
-                  // siendo salto de linea.
-                  if (e.key !== "Enter") return
-                  if (e.target instanceof HTMLTextAreaElement) return
-                  e.preventDefault()
-                  e.currentTarget.requestSubmit()
-                }}
+                onKeyDown={(e) => avanzarConEnter(e, ORDEN_PASO_1)}
               >
               <div className="space-y-2">
                 <Label htmlFor="recibio">Recibió en taller</Label>
                 <Input
                   id="recibio"
+                  autoFocus
                   value={receivedBy}
                   onChange={(e) => setReceivedBy(e.target.value)}
                 />
@@ -570,7 +618,6 @@ export default function NuevoTicketPage() {
                   id="telefono"
                   type="tel"
                   inputMode="tel"
-                  autoFocus
                   placeholder="9999-9999"
                   value={clientPhone}
                   onChange={(e) => setClientPhone(e.target.value)}
@@ -626,16 +673,7 @@ export default function NuevoTicketPage() {
                   e.preventDefault()
                   irAlPaso3()
                 }}
-              onKeyDown={(e) => {
-                  // Enter avanza desde cualquier campo de una linea. No se
-                  // confia en el envio implicito del navegador, que no se
-                  // disparo de forma fiable aca. En el textarea Enter sigue
-                  // siendo salto de linea.
-                  if (e.key !== "Enter") return
-                  if (e.target instanceof HTMLTextAreaElement) return
-                  e.preventDefault()
-                  e.currentTarget.requestSubmit()
-                }}
+                onKeyDown={(e) => avanzarConEnter(e, ORDEN_PASO_2)}
               >
               <div className="space-y-2">
                 <Label htmlFor="tipo">Tipo de equipo</Label>
