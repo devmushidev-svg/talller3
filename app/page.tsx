@@ -44,6 +44,8 @@ import { buildTicketWhatsAppTemplates } from "@/lib/whatsapp"
 import { toast } from "sonner"
 import { EstadoError } from "@/components/estado-lista"
 import { fetchLista, mensajeDeError } from "@/lib/fetch-lista"
+import { VistaTicketsTabs } from "@/components/vista-tickets-tabs"
+import { VISTAS, ordenarPorFecha, perteneceALaVista, urlDeVista, type Orden, type Vista } from "@/lib/vistas-ticket"
 
 function parseTicket(t: Ticket): Ticket {
   return {
@@ -89,17 +91,20 @@ export default function DashboardPage() {
   const [statsError, setStatsError] = useState<string | null>(null)
   const [reintento, setReintento] = useState(0)
   const [ticketAbierto, setTicketAbierto] = useState<Ticket | null>(null)
+  const [vista, setVista] = useState<Vista>("activos")
+  const [orden, setOrden] = useState<Orden>("nuevos")
 
   useEffect(() => {
     let cancelled = false
     setTicketsLoading(true)
     setTicketsError(null)
-    fetchLista<Ticket>("/api/tickets?scope=active&limit=8")
+    fetchLista<Ticket>(urlDeVista(vista, ""))
       .then((data) => {
         if (cancelled) return
-        setTickets(
-          data.map((t) => parseTicket(t)).filter((t) => t.status !== "entregado")
-        )
+        const deLaVista = data
+          .filter((t) => perteneceALaVista(String(t.status ?? ""), vista))
+          .map((t) => parseTicket(t))
+        setTickets(ordenarPorFecha(deLaVista, orden))
       })
       .catch((e) => {
         if (cancelled) return
@@ -114,7 +119,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true
     }
-  }, [reintento])
+  }, [reintento, vista, orden])
 
   useEffect(() => {
     let cancelled = false
@@ -155,7 +160,12 @@ export default function DashboardPage() {
       })
       if (!res.ok) throw new Error("No se pudo actualizar")
       setTickets((prev) => {
-        if (newStatus === "entregado") return prev.filter((t) => t.id !== ticketId)
+        // El ticket se va de la lista solo si su nuevo estado ya no cae en la
+        // vista abierta. En "Entregados" o "Todos", entregarlo lo deja donde
+        // esta en vez de hacerlo desaparecer de golpe.
+        if (!perteneceALaVista(newStatus, vista)) {
+          return prev.filter((t) => t.id !== ticketId)
+        }
         return prev.map((t) => (t.id === ticketId ? { ...t, status: newStatus } : t))
       })
       // Entregado sale de la lista, asi que la ventana se cierra sola; en el
@@ -163,9 +173,9 @@ export default function DashboardPage() {
       setTicketAbierto((abierto) =>
         abierto?.id !== ticketId
           ? abierto
-          : newStatus === "entregado"
-            ? null
-            : { ...abierto, status: newStatus }
+          : perteneceALaVista(newStatus, vista)
+            ? { ...abierto, status: newStatus }
+            : null
       )
       if (newStatus === "entregado") {
         setStats((previous) =>
@@ -220,8 +230,9 @@ export default function DashboardPage() {
     Array.isArray(t.accessories) ? t.accessories.filter(Boolean) : []
 
   // La API ya entrega los tickets del más reciente al más antiguo.
-  const recentTickets = tickets.slice(0, 8)
-  const activeTicketCount = stats?.activeTickets ?? null
+  // El inicio es un resumen: muestra un tope y remite a la lista completa.
+  const TOPE_EN_INICIO = 12
+  const recentTickets = tickets.slice(0, TOPE_EN_INICIO)
 
   return (
     <DashboardLayout>
@@ -328,27 +339,34 @@ export default function DashboardPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="flex items-center gap-2 text-lg font-semibold">
               <ClipboardList className="h-5 w-5 text-primary" />
-              En taller
-              {activeTicketCount !== null && (
+              {VISTAS.find((v) => v.id === vista)?.label}
+              {!ticketsLoading && (
                 <Badge variant="secondary" className="font-normal">
-                  {activeTicketCount} activo{activeTicketCount !== 1 ? "s" : ""}
+                  {tickets.length} equipo{tickets.length !== 1 ? "s" : ""}
                 </Badge>
               )}
             </h2>
             <div className="flex items-center gap-3">
-              {activeTicketCount !== null && activeTicketCount > recentTickets.length && (
+              {tickets.length > recentTickets.length && (
                 <span className="hidden text-xs text-muted-foreground sm:inline">
-                  Mostrando los {recentTickets.length} más recientes
+                  Mostrando {recentTickets.length} de {tickets.length}
                 </span>
               )}
               <Button variant="outline" size="sm" asChild>
                 <Link href="/tickets-activos">
-                  Lista completa y filtros
+                  Lista completa
                   <ArrowRight className="ml-1.5 h-4 w-4" />
                 </Link>
               </Button>
             </div>
           </div>
+
+          <VistaTicketsTabs
+            vista={vista}
+            onVistaChange={setVista}
+            orden={orden}
+            onOrdenChange={setOrden}
+          />
 
           {ticketsLoading ? (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

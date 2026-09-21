@@ -71,6 +71,8 @@ import Link from "next/link"
 import { EstadoError, EstadoVacio } from "@/components/estado-lista"
 import { mensajeDeError } from "@/lib/fetch-lista"
 import { cn } from "@/lib/utils"
+import { VistaTicketsTabs } from "@/components/vista-tickets-tabs"
+import { VISTAS, ordenarPorFecha, perteneceALaVista, soloActivos, urlDeVista, type Orden, type Vista } from "@/lib/vistas-ticket"
 
 const statusOptions: TicketStatus[] = [
   "recibido",
@@ -86,31 +88,6 @@ const activeStatusOptions: Exclude<TicketStatus, "entregado">[] = [
   "en_reparacion",
   "listo",
 ]
-
-/**
- * Las cuatro vistas de la pantalla.
- *
- * Reemplazan al panel de filtros desplegable: las tres preguntas que se hacen
- * de verdad son "que hay en taller", "que puedo entregar" y "que se entrego".
- * `scope: "active"` pide solo los no entregados; las otras dos traen todo.
- */
-type Vista = "activos" | "listos" | "entregados" | "todos"
-
-const VISTAS: { id: Vista; label: string; soloActivos: boolean }[] = [
-  { id: "activos", label: "En taller", soloActivos: true },
-  { id: "listos", label: "Listos para entregar", soloActivos: true },
-  { id: "entregados", label: "Entregados", soloActivos: false },
-  { id: "todos", label: "Todos", soloActivos: false },
-]
-
-function perteneceALaVista(estado: string, vista: Vista) {
-  const e = estado.toLowerCase()
-  const entregado = e === "entregado" || e === "delivered"
-  if (vista === "entregados") return entregado
-  if (vista === "listos") return e === "listo"
-  if (vista === "activos") return !entregado
-  return true
-}
 
 const ACTIVE_STATUS_VALUES = new Set([
   ...activeStatusOptions,
@@ -357,7 +334,7 @@ export default function TicketsActivosPage() {
   // Advanced filters
   const [vista, setVista] = useState<Vista>("activos")
   /** "nuevos" = los ultimos arriba; "viejos" = lo que lleva mas tiempo. */
-  const [orden, setOrden] = useState<"nuevos" | "viejos">("nuevos")
+  const [orden, setOrden] = useState<Orden>("nuevos")
 
   // Edit mode
   const [editMode, setEditMode] = useState(false)
@@ -391,20 +368,10 @@ export default function TicketsActivosPage() {
       setLoading(true)
 
       try {
-        const soloActivos =
-          VISTAS.find((v) => v.id === vista)?.soloActivos ?? true
-
-        let url: string
-        if (searchTerm) {
-          // La busqueda pega contra /api/search; el filtro por vista se aplica
-          // despues, en cliente, para que buscar dentro de "Entregados"
-          // devuelva entregados y no lo que el servidor considere activo.
-          const params = new URLSearchParams({ q: searchTerm })
-          if (soloActivos) params.set("scope", "active")
-          url = `/api/search?${params}`
-        } else {
-          url = soloActivos ? "/api/tickets?scope=active" : "/api/tickets"
-        }
+        // El filtro por vista se aplica en cliente para que buscar dentro de
+        // "Entregados" devuelva entregados y no lo que el servidor considere
+        // activo.
+        const url = urlDeVista(vista, searchTerm)
 
         setLoadError(null)
         const response = await fetch(url, { signal: controller.signal })
@@ -423,13 +390,9 @@ export default function TicketsActivosPage() {
             )
           )
           .map((ticket) => parseTicket(ticket))
-          .sort((a, b) => {
-            const ta = Date.parse(a.created_at) || 0
-            const tb = Date.parse(b.created_at) || 0
-            return orden === "nuevos" ? tb - ta : ta - tb
-          })
+        const ordenados = ordenarPorFecha(parsedTickets, orden)
 
-        setTickets(parsedTickets)
+        setTickets(ordenados)
       } catch (error) {
         if (controller.signal.aborted || requestId !== ticketsRequestIdRef.current) {
           return
@@ -670,51 +633,12 @@ export default function TicketsActivosPage() {
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Pestañas: las tres preguntas reales, sin panel que desplegar */}
-            <div
-              role="tablist"
-              aria-label="Qué tickets ver"
-              className="flex flex-wrap gap-1 rounded-xl border border-border bg-card p-1"
-            >
-              {VISTAS.map((v) => {
-                const activa = v.id === vista
-                return (
-                  <button
-                    key={v.id}
-                    role="tab"
-                    type="button"
-                    aria-selected={activa}
-                    onClick={() => setVista(v.id)}
-                    className={cn(
-                      "min-h-11 rounded-lg px-3 text-sm transition-colors",
-                      activa
-                        ? "bg-accent font-medium text-accent-foreground"
-                        : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-                    )}
-                  >
-                    {v.label}
-                  </button>
-                )
-              })}
-            </div>
-
-            <Button
-              variant="outline"
-              className="ml-auto shrink-0 gap-1.5"
-              onClick={() =>
-                setOrden((o) => (o === "nuevos" ? "viejos" : "nuevos"))
-              }
-              aria-label={
-                orden === "nuevos"
-                  ? "Ordenado: primero los más nuevos. Cambiar a más viejos."
-                  : "Ordenado: primero los más viejos. Cambiar a más nuevos."
-              }
-            >
-              <ArrowDownUp className="h-4 w-4" />
-              {orden === "nuevos" ? "Más nuevos" : "Más viejos"}
-            </Button>
-          </div>
+          <VistaTicketsTabs
+            vista={vista}
+            onVistaChange={setVista}
+            orden={orden}
+            onOrdenChange={setOrden}
+          />
         </div>
 
         {/* ── Resultados ─────────────────────────────── */}
