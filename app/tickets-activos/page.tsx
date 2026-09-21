@@ -37,7 +37,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import {
   Ticket,
   TicketStatus,
@@ -49,11 +48,12 @@ import {
   Eye,
   Printer,
   Loader2,
-  Filter,
   Calendar,
   Tag,
   Image as ImageIcon,
   ClipboardList,
+  ArrowDownUp,
+  SearchX,
   Smartphone,
   X,
   Pencil,
@@ -65,6 +65,14 @@ import { PrintInternal } from "@/components/print-internal"
 import { PhoneActions } from "@/components/phone-actions"
 import { buildTicketWhatsAppTemplates } from "@/lib/whatsapp"
 import { formatDateOnlyForDisplay } from "@/lib/date-utils"
+import { StatusPill, statusBase } from "@/components/status-pill"
+import { toast } from "sonner"
+import Link from "next/link"
+import { EstadoError, EstadoVacio } from "@/components/estado-lista"
+import { mensajeDeError } from "@/lib/fetch-lista"
+import { cn } from "@/lib/utils"
+import { VistaTicketsTabs } from "@/components/vista-tickets-tabs"
+import { VISTAS, ordenarPorFecha, perteneceALaVista, soloActivos, urlDeVista, type Orden, type Vista } from "@/lib/vistas-ticket"
 
 const statusOptions: TicketStatus[] = [
   "recibido",
@@ -99,30 +107,6 @@ function normalizeTicketStatus(status: unknown): TicketStatus {
     : (normalizedStatus as TicketStatus)
 }
 
-/** Color por estado (variable CSS, se adapta a claro/oscuro) */
-const STATUS_VAR: Record<TicketStatus, string> = {
-  recibido: "var(--chart-1)",
-  en_diagnostico: "var(--warning)",
-  en_reparacion: "var(--chart-2)",
-  listo: "var(--success)",
-  entregado: "var(--muted-foreground)",
-}
-
-/** Píldora de estado con tinte por color */
-function StatusPill({ status }: { status: TicketStatus }) {
-  const color = STATUS_VAR[status]
-  return (
-    <span
-      className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-      style={{
-        backgroundColor: `color-mix(in oklch, ${color} 16%, transparent)`,
-        color,
-      }}
-    >
-      {STATUS_LABELS[status]}
-    </span>
-  )
-}
 
 interface ScrollSafeTableRowProps {
   children: ReactNode
@@ -237,7 +221,7 @@ function ActiveTicketMobileCard({
 
   return (
     <article>
-      <Card className="overflow-hidden border-border/70 shadow-sm">
+      <Card className="overflow-hidden border-border shadow-sm">
         <CardContent className="space-y-4 p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 space-y-1">
@@ -254,7 +238,7 @@ function ActiveTicketMobileCard({
           <div className="flex flex-wrap gap-2 text-xs">
             <Badge variant="secondary" className="font-normal">{equipment}</Badge>
             {brandModel && (
-              <span className="rounded-full border border-border/70 px-2.5 py-1 text-muted-foreground">
+              <span className="rounded-full border border-border px-2.5 py-1 text-muted-foreground">
                 {brandModel}
               </span>
             )}
@@ -266,7 +250,7 @@ function ActiveTicketMobileCard({
             </p>
           )}
 
-          <div className="flex items-center justify-between gap-3 border-t border-border/70 pt-3 text-xs text-muted-foreground">
+          <div className="flex items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
             <span>{formattedDate}</span>
             {ticket.total_cost != null && ticket.total_cost > 0 && (
               <span className="font-semibold tabular-nums text-success">
@@ -339,17 +323,18 @@ export default function TicketsActivosPage() {
   const [showCustomerPrint, setShowCustomerPrint] = useState(false)
   const [showInternalPrint, setShowInternalPrint] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [showFilters, setShowFilters] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [reintento, setReintento] = useState(0)
+
   const [savingStatusIds, setSavingStatusIds] = useState<Set<string>>(
     () => new Set()
   )
   const ticketsRequestIdRef = useRef(0)
 
   // Advanced filters
-  const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [equipmentFilter, setEquipmentFilter] = useState<string>("all")
-  const [dateFrom, setDateFrom] = useState("")
-  const [dateTo, setDateTo] = useState("")
+  const [vista, setVista] = useState<Vista>("activos")
+  /** "nuevos" = los ultimos arriba; "viejos" = lo que lleva mas tiempo. */
+  const [orden, setOrden] = useState<Orden>("nuevos")
 
   // Edit mode
   const [editMode, setEditMode] = useState(false)
@@ -383,29 +368,12 @@ export default function TicketsActivosPage() {
       setLoading(true)
 
       try {
-        const params = new URLSearchParams()
-        const hasSearchFilters = Boolean(
-          searchTerm ||
-            statusFilter !== "all" ||
-            equipmentFilter !== "all" ||
-            dateFrom ||
-            dateTo
-        )
-        if (hasSearchFilters) params.set("scope", "active")
-        if (searchTerm) params.set("q", searchTerm)
-        // Se filtra en cliente para que "recibido" incluya el alias "received".
-        if (statusFilter !== "all" && statusFilter !== "recibido") {
-          params.set("status", statusFilter)
-        }
-        if (equipmentFilter !== "all") {
-          params.set("equipment_type", equipmentFilter)
-        }
-        if (dateFrom) params.set("date_from", dateFrom)
-        if (dateTo) params.set("date_to", dateTo)
+        // El filtro por vista se aplica en cliente para que buscar dentro de
+        // "Entregados" devuelva entregados y no lo que el servidor considere
+        // activo.
+        const url = urlDeVista(vista, searchTerm)
 
-        const url = hasSearchFilters
-          ? `/api/search?${params}`
-          : "/api/tickets?scope=active"
+        setLoadError(null)
         const response = await fetch(url, { signal: controller.signal })
         if (!response.ok) {
           throw new Error(`No se pudieron cargar los tickets (${response.status})`)
@@ -416,20 +384,22 @@ export default function TicketsActivosPage() {
 
         const parsedTickets = (Array.isArray(data) ? data : [])
           .filter((ticket): ticket is Ticket =>
-            isActiveTicketStatus((ticket as { status?: unknown })?.status)
+            perteneceALaVista(
+              String((ticket as { status?: unknown })?.status ?? ""),
+              vista
+            )
           )
           .map((ticket) => parseTicket(ticket))
-          .filter(
-            (ticket) =>
-              statusFilter === "all" || ticket.status === statusFilter
-          )
+        const ordenados = ordenarPorFecha(parsedTickets, orden)
 
-        setTickets(parsedTickets)
+        setTickets(ordenados)
       } catch (error) {
         if (controller.signal.aborted || requestId !== ticketsRequestIdRef.current) {
           return
         }
         console.error("Error fetching tickets:", error)
+        setLoadError(mensajeDeError(error))
+        setTickets([])
       } finally {
         if (requestId === ticketsRequestIdRef.current) {
           setLoading(false)
@@ -441,7 +411,7 @@ export default function TicketsActivosPage() {
       clearTimeout(debounce)
       controller.abort()
     }
-  }, [searchTerm, statusFilter, equipmentFilter, dateFrom, dateTo])
+  }, [searchTerm, vista, orden, reintento])
 
   const handleStatusChange = async (ticketId: string, newStatus: TicketStatus) => {
     if (savingStatusIds.has(ticketId)) return
@@ -478,10 +448,9 @@ export default function TicketsActivosPage() {
       }
 
       setTickets((prev) => {
-        if (
-          !isActiveTicketStatus(newStatus) ||
-          (statusFilter !== "all" && statusFilter !== newStatus)
-        ) {
+        // Si el nuevo estado ya no cae en la vista abierta, el ticket se va de
+        // la lista: dejarlo seria mostrar un entregado dentro de "En taller".
+        if (!perteneceALaVista(newStatus, vista)) {
           return prev.filter((ticket) => ticket.id !== ticketId)
         }
 
@@ -498,7 +467,7 @@ export default function TicketsActivosPage() {
       }
     } catch (error) {
       console.error("Error updating status:", error)
-      alert(
+      toast.error(
         error instanceof Error
           ? error.message
           : "No se pudo cambiar el estado del ticket"
@@ -517,7 +486,7 @@ export default function TicketsActivosPage() {
     const name = editClientName.trim()
     const phone = editClientPhone.trim()
     if (!name || !phone) {
-      alert("Nombre y teléfono son obligatorios")
+      toast.error("Nombre y teléfono son obligatorios")
       return
     }
     setSavingClient(true)
@@ -536,7 +505,7 @@ export default function TicketsActivosPage() {
       )
     } catch (e) {
       console.error(e)
-      alert("No se pudo guardar los datos del cliente")
+      toast.error("No se pudo guardar los datos del cliente")
     } finally {
       setSavingClient(false)
     }
@@ -634,14 +603,11 @@ export default function TicketsActivosPage() {
   const formatDate = (dateStr: string) => formatDateOnlyForDisplay(dateStr, "es-MX")
 
   const clearFilters = () => {
-    setStatusFilter("all")
-    setEquipmentFilter("all")
-    setDateFrom("")
-    setDateTo("")
     setSearchTerm("")
+    setVista("activos")
   }
 
-  const hasActiveFilters = statusFilter !== 'all' || equipmentFilter !== 'all' || dateFrom || dateTo
+  const hasActiveFilters = vista !== "activos" 
 
   const displayId = (t: Ticket) =>
     t.ticket_seq != null ? `N° ${t.ticket_seq}` : t.id
@@ -650,118 +616,37 @@ export default function TicketsActivosPage() {
     <DashboardLayout>
       <div className="space-y-8">
         <PageHeader
-          icon={ClipboardList}
           title="Tickets Activos"
           description="Busca, filtra y gestiona los equipos en taller."
           action={<QRScanner onScan={handleQRScan} />}
         />
 
-        {/* ── Búsqueda y filtros ─────────────────────── */}
-        <Collapsible open={showFilters} onOpenChange={setShowFilters}>
-          <Card>
-            <CardContent className="space-y-4 p-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="Cliente, N° ticket, teléfono o modelo"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="h-11 pl-10"
-                  />
-                </div>
-                <CollapsibleTrigger asChild>
-                  <Button
-                    variant={hasActiveFilters ? "default" : "outline"}
-                    className="h-11 shrink-0 gap-2"
-                  >
-                    <Filter className="h-4 w-4" />
-                    Filtros
-                    {hasActiveFilters && (
-                      <span className="ml-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-background/25 text-[11px] font-semibold">
-                        !
-                      </span>
-                    )}
-                  </Button>
-                </CollapsibleTrigger>
-              </div>
+        {/* ── Búsqueda, vistas y orden ───────────────── */}
+        <div className="space-y-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Cliente, N° ticket, teléfono o modelo"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-11 pl-10"
+            />
+          </div>
 
-              <CollapsibleContent className="space-y-4">
-                <div className="grid gap-4 border-t border-border/70 pt-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="space-y-2">
-                    <Label>Estado</Label>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Todos" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos los activos</SelectItem>
-                        {activeStatusOptions.map(status => (
-                          <SelectItem key={status} value={status}>
-                            {STATUS_LABELS[status]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Tipo de Equipo</Label>
-                    <Select value={equipmentFilter} onValueChange={setEquipmentFilter}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Todos" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        {Object.entries(EQUIPMENT_LABELS).map(([key, label]) => (
-                          <SelectItem key={key} value={key}>{label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-1.5">
-                      <Calendar className="h-3.5 w-3.5" />
-                      Fecha Desde
-                    </Label>
-                    <Input
-                      type="date"
-                      value={dateFrom}
-                      onChange={(e) => setDateFrom(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-1.5">
-                      <Calendar className="h-3.5 w-3.5" />
-                      Fecha Hasta
-                    </Label>
-                    <Input
-                      type="date"
-                      value={dateTo}
-                      onChange={(e) => setDateTo(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {hasActiveFilters && (
-                  <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1.5">
-                    <X className="h-4 w-4" />
-                    Limpiar filtros
-                  </Button>
-                )}
-              </CollapsibleContent>
-            </CardContent>
-          </Card>
-        </Collapsible>
+          <VistaTicketsTabs
+            vista={vista}
+            onVistaChange={setVista}
+            orden={orden}
+            onOrdenChange={setOrden}
+          />
+        </div>
 
         {/* ── Resultados ─────────────────────────────── */}
         <section className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="flex items-center gap-2 text-lg font-semibold">
               <ClipboardList className="h-5 w-5 text-primary" />
-              En taller
+              {VISTAS.find((v) => v.id === vista)?.label}
             </h2>
             {!loading && (
               <Badge variant="secondary" className="font-normal">
@@ -784,24 +669,38 @@ export default function TicketsActivosPage() {
                 ))}
               </CardContent>
             </Card>
+          ) : loadError ? (
+            <EstadoError
+              mensaje={loadError}
+              onReintentar={() => setReintento((n) => n + 1)}
+            />
           ) : tickets.length === 0 ? (
-            <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-card/50 py-16 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-brand-soft">
-                <Search className="h-8 w-8 text-primary" />
-              </div>
-              <div>
-                <p className="font-medium">No se encontraron tickets</p>
-                <p className="text-sm text-muted-foreground">
-                  Ajusta la búsqueda o limpia los filtros para ver más resultados.
-                </p>
-              </div>
-              {hasActiveFilters && (
-                <Button variant="outline" onClick={clearFilters} className="gap-1.5">
-                  <X className="h-4 w-4" />
-                  Limpiar filtros
-                </Button>
-              )}
-            </div>
+            /* Dos mensajes distintos a proposito: "no hay tickets" cuando en
+               realidad el filtro no encontro nada es un bug de comunicacion. */
+            hasActiveFilters || searchTerm ? (
+              <EstadoVacio
+                icon={SearchX}
+                titulo="Sin coincidencias"
+                detalle="Ningun ticket activo coincide con la busqueda o los filtros."
+                accion={
+                  <Button variant="outline" onClick={clearFilters} className="gap-1.5">
+                    <X className="h-4 w-4" />
+                    Limpiar filtros
+                  </Button>
+                }
+              />
+            ) : (
+              <EstadoVacio
+                icon={ClipboardList}
+                titulo="No hay equipos en taller"
+                detalle="Cuando recibas un equipo, el ticket aparece aca."
+                accion={
+                  <Button asChild>
+                    <Link href="/nuevo-ticket">Crear el primero</Link>
+                  </Button>
+                }
+              />
+            )
           ) : (
             <>
               <div className="grid gap-3 md:hidden">
@@ -874,7 +773,7 @@ export default function TicketsActivosPage() {
                               }
                             >
                               <SelectTrigger
-                                className="h-9 w-[150px] border-border/70"
+                                className="h-9 w-[150px] border-border"
                                 aria-busy={savingStatusIds.has(ticket.id)}
                               >
                                 <StatusPill status={ticket.status} />
@@ -964,7 +863,7 @@ export default function TicketsActivosPage() {
 
               <div className="space-y-6 pt-2">
                 {/* Client Info */}
-                <div className="space-y-3 rounded-2xl border border-border/70 bg-muted/30 p-4">
+                <div className="space-y-3 rounded-2xl border border-border bg-muted/30 p-4">
                   <p className="text-sm font-semibold text-foreground">Datos del cliente</p>
                   <div className="space-y-2">
                     <Label htmlFor="edit-client-name">Nombre</Label>
@@ -1015,7 +914,7 @@ export default function TicketsActivosPage() {
                 </div>
 
                 {/* Equipment Info */}
-                <div className="rounded-2xl border border-border/70 p-4">
+                <div className="rounded-2xl border border-border p-4">
                   <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                     <div>
                       <p className="text-xs text-muted-foreground">Tipo</p>
@@ -1038,7 +937,7 @@ export default function TicketsActivosPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="mt-4 border-t border-border/70 pt-4">
+                  <div className="mt-4 border-t border-border pt-4">
                     <p className="text-xs text-muted-foreground">Contraseña del equipo</p>
                     <p className="font-mono font-medium">
                       {selectedTicket.device_password?.trim() || "—"}
@@ -1109,7 +1008,7 @@ export default function TicketsActivosPage() {
 
                 {/* Diagnosis & Repair (editable) */}
                 {editMode ? (
-                  <div className="space-y-4 rounded-2xl border border-border/70 bg-muted/40 p-4">
+                  <div className="space-y-4 rounded-2xl border border-border bg-muted/40 p-4">
                     <div className="space-y-2">
                       <Label>Diagnóstico</Label>
                       <Textarea
@@ -1192,7 +1091,7 @@ export default function TicketsActivosPage() {
                     )}
 
                     {selectedTicket.total_cost != null && selectedTicket.total_cost > 0 && (
-                      <div className="grid grid-cols-2 gap-4 rounded-2xl border border-border/70 bg-muted/30 p-4 sm:grid-cols-4">
+                      <div className="grid grid-cols-2 gap-4 rounded-2xl border border-border bg-muted/30 p-4 sm:grid-cols-4">
                         <div>
                           <p className="text-xs text-muted-foreground">Mano de Obra</p>
                           <p className="font-medium tabular-nums">L. {selectedTicket.labor_cost?.toFixed(2) || '0.00'}</p>
@@ -1220,7 +1119,7 @@ export default function TicketsActivosPage() {
                 )}
 
                 {/* Actions */}
-                <div className="space-y-4 border-t border-border/70 pt-4">
+                <div className="space-y-4 border-t border-border pt-4">
                   <div className="space-y-2">
                     <Label>Cambiar estado</Label>
                     <Select

@@ -85,12 +85,12 @@ export function PrintInternal({ ticket, open, onOpenChange }: PrintInternalProps
           </p>
 
           {/* POS Receipt */}
-          <Card className={printed.pos ? "border-green-500 bg-green-50 dark:bg-green-950" : ""}>
+          <Card className={printed.pos ? "estado-tinte border-success [--st:var(--success)]" : ""}>
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
                 <Receipt className="h-4 w-4" />
                 Ticket POS ({settings.printer_width})
-                {printed.pos && <Check className="h-4 w-4 text-green-600 ml-auto" />}
+                {printed.pos && <Check className="ml-auto h-4 w-4 text-success-fg" />}
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
@@ -106,12 +106,12 @@ export function PrintInternal({ ticket, open, onOpenChange }: PrintInternalProps
           </Card>
 
           {/* Device Label */}
-          <Card className={printed.device ? "border-green-500 bg-green-50 dark:bg-green-950" : ""}>
+          <Card className={printed.device ? "estado-tinte border-success [--st:var(--success)]" : ""}>
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
                 <Tag className="h-4 w-4" />
                 Etiqueta para Equipo
-                {printed.device && <Check className="h-4 w-4 text-green-600 ml-auto" />}
+                {printed.device && <Check className="ml-auto h-4 w-4 text-success-fg" />}
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
@@ -128,12 +128,12 @@ export function PrintInternal({ ticket, open, onOpenChange }: PrintInternalProps
 
           {/* Accessory Labels */}
           {accessories.length > 0 && (
-            <Card className={printed.accessories ? "border-green-500 bg-green-50 dark:bg-green-950" : ""}>
+            <Card className={printed.accessories ? "estado-tinte border-success [--st:var(--success)]" : ""}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Tag className="h-4 w-4" />
                   Etiquetas de Accesorios ({accessories.length})
-                  {printed.accessories && <Check className="h-4 w-4 text-green-600 ml-auto" />}
+                  {printed.accessories && <Check className="ml-auto h-4 w-4 text-success-fg" />}
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-0">

@@ -78,7 +78,7 @@ export function PrintCustomer({ ticket, open, onOpenChange }: PrintCustomerProps
           </div>
 
           {printed && (
-            <div className="flex items-center justify-center gap-2 p-3 bg-green-100 dark:bg-green-900 rounded-lg text-green-700 dark:text-green-300">
+            <div className="estado-tinte flex items-center justify-center gap-2 rounded-lg p-3 text-success-fg [--st:var(--success)]">
               <Check className="h-5 w-5" />
               <span>Impreso correctamente</span>
             </div>

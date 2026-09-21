@@ -29,6 +29,7 @@ import {
   Phone,
   MapPin,
 } from "lucide-react"
+import { toast } from "sonner"
 
 export default function ConfiguracionPage() {
   const [shopName, setShopName] = useState("Mi Taller")
@@ -70,10 +71,10 @@ export default function ConfiguracionPage() {
           printer_width: printerWidth,
         }),
       })
-      alert("Configuración guardada correctamente")
+      toast.success("Configuración guardada correctamente")
     } catch (error) {
       console.error("Error saving settings:", error)
-      alert("Error al guardar la configuración")
+      toast.error("Error al guardar la configuración")
     } finally {
       setSaving(false)
     }
@@ -84,7 +85,6 @@ export default function ConfiguracionPage() {
       <DashboardLayout>
         <div className="mx-auto max-w-3xl space-y-8">
           <PageHeader
-            icon={Settings}
             title="Configuración"
             description="Ajustes del taller y la impresión."
           />
@@ -92,7 +92,7 @@ export default function ConfiguracionPage() {
             {Array.from({ length: 2 }).map((_, i) => (
               <div
                 key={i}
-                className="rounded-2xl border border-border/70 bg-card p-6"
+                className="rounded-2xl border border-border bg-card p-6"
               >
                 <div className="flex items-center gap-3">
                   <div className="h-11 w-11 shrink-0 rounded-xl shimmer" />
@@ -117,7 +117,6 @@ export default function ConfiguracionPage() {
     <DashboardLayout>
       <div className="mx-auto max-w-3xl space-y-8">
         <PageHeader
-          icon={Settings}
           title="Configuración"
           description="Ajustes del taller y la impresión."
           action={
@@ -132,19 +131,12 @@ export default function ConfiguracionPage() {
           }
         />
 
-        <div className="space-y-6 stagger">
+        <div className="space-y-6">
           {/* ── Datos del taller ───────────────────────── */}
-          <Card>
+          <Card className="border-border">
             <CardHeader>
               <div className="flex items-center gap-3">
-                <span
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
-                  style={{
-                    backgroundColor:
-                      "color-mix(in oklch, var(--chart-1) 15%, transparent)",
-                    color: "var(--chart-1)",
-                  }}
-                >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
                   <Store className="h-5 w-5" />
                 </span>
                 <div className="space-y-0.5">
@@ -202,17 +194,10 @@ export default function ConfiguracionPage() {
           </Card>
 
           {/* ── Impresora ──────────────────────────────── */}
-          <Card>
+          <Card className="border-border">
             <CardHeader>
               <div className="flex items-center gap-3">
-                <span
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
-                  style={{
-                    backgroundColor:
-                      "color-mix(in oklch, var(--chart-2) 15%, transparent)",
-                    color: "var(--chart-2)",
-                  }}
-                >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
                   <Printer className="h-5 w-5" />
                 </span>
                 <div className="space-y-0.5">

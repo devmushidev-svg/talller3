@@ -8,7 +8,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
-      <main className="min-w-0 lg:pl-64">
+      <main className="min-w-0 lg:pl-60">
         {/* Contenedor centrado con ancho máximo y espaciado consistente.
             key por ruta => re-dispara la animación de entrada al navegar. */}
         <div

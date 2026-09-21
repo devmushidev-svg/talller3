@@ -11,6 +11,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { cn } from "@/lib/utils"
 import { whatsappUrl, type WhatsAppTemplate } from "@/lib/whatsapp"
 
@@ -36,6 +46,17 @@ interface PhoneActionsProps {
   message?: string
   /** Plantillas por situación: el botón de WhatsApp abre un menú para elegir. */
   templates?: WhatsAppTemplate[]
+  /**
+   * Marca el equipo como listo para entrega.
+   *
+   * Si se pasa junto con `preguntarMarcarListo`, elegir la plantilla "Equipo
+   * listo para retirar" abre una confirmacion ANTES de ir a WhatsApp: avisarle
+   * al cliente y dejar el ticket en el estado anterior es la forma tipica de
+   * que despues nadie sepa que equipos ya estan avisados.
+   */
+  marcarListo?: () => void
+  /** Solo se pregunta si el ticket todavia no esta en "listo". */
+  preguntarMarcarListo?: boolean
   /** Mostrar texto junto a los iconos. Por defecto solo iconos. */
   showLabels?: boolean
   size?: "sm" | "default"
@@ -46,15 +67,38 @@ export function PhoneActions({
   phone,
   message,
   templates,
+  marcarListo,
+  preguntarMarcarListo = false,
   showLabels = false,
   size = "default",
   className,
 }: PhoneActionsProps) {
   const [copied, setCopied] = useState(false)
+  const [textoPendiente, setTextoPendiente] = useState<string | null>(null)
 
   const openWhatsApp = (text?: string) => {
     const url = whatsappUrl(phone, text)
     if (url) window.open(url, "_blank", "noopener,noreferrer")
+  }
+
+  const elegirPlantilla = (tpl: WhatsAppTemplate) => {
+    if (tpl.id === "listo" && preguntarMarcarListo && marcarListo) {
+      setTextoPendiente(tpl.text)
+      return
+    }
+    openWhatsApp(tpl.text)
+  }
+
+  /**
+   * WhatsApp se abre PRIMERO y el guardado va despues, a proposito: abrir una
+   * pestana pierde el gesto del usuario si antes se espera a la red, y el
+   * bloqueador de ventanas emergentes la cancela.
+   */
+  const confirmar = (tambienMarcar: boolean) => {
+    const texto = textoPendiente
+    setTextoPendiente(null)
+    if (texto) openWhatsApp(texto)
+    if (tambienMarcar) marcarListo?.()
   }
 
   const handleCopy = async (e: React.MouseEvent) => {
@@ -114,7 +158,7 @@ export function PhoneActions({
               <DropdownMenuItem
                 key={tpl.id}
                 className="flex-col items-start gap-0.5 whitespace-normal py-2"
-                onSelect={() => openWhatsApp(tpl.text)}
+                onSelect={() => elegirPlantilla(tpl)}
               >
                 <span className="font-medium">{tpl.label}</span>
                 <span className="line-clamp-2 text-xs text-muted-foreground">
@@ -162,6 +206,32 @@ export function PhoneActions({
         {copied ? <Check className={iconSize} /> : <Copy className={iconSize} />}
         {showLabels && <span>{copied ? "Copiado" : "Copiar"}</span>}
       </Button>
+
+      <AlertDialog
+        open={textoPendiente !== null}
+        onOpenChange={(abierto) => {
+          if (!abierto) setTextoPendiente(null)
+        }}
+      >
+        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Marcar el equipo como listo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Le va a avisar al cliente que su equipo está listo, pero el ticket
+              todavía no lo está. Si no se marca, mañana nadie va a saber a
+              quién ya se le avisó.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => confirmar(false)}>
+              Solo enviar el mensaje
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => confirmar(true)}>
+              Marcar y enviar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

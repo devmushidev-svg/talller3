@@ -99,12 +99,20 @@ export const STATUS_LABELS: Record<TicketStatus, string> = {
   entregado: 'Entregado'
 }
 
-export const STATUS_COLORS: Record<TicketStatus, string> = {
-  recibido: 'bg-chart-1 text-primary-foreground',
-  en_diagnostico: 'bg-warning text-warning-foreground',
-  en_reparacion: 'bg-chart-2 text-white',
-  listo: 'bg-success text-success-foreground',
-  entregado: 'bg-muted text-muted-foreground'
+/**
+ * Tokens de color por estado. Cada estado tiene DOS valores y esa es la
+ * razon de que se lea:
+ *   base -> color vivo: barras, puntos, iconos (minimo 3:1)
+ *   fg   -> tinta: texto sobre el tinte del badge (minimo 4.5:1)
+ * Los valores viven en app/globals.css y se invierten solos entre temas.
+ * Ninguna pantalla debe volver a escribir un color de estado.
+ */
+export const STATUS_TOKENS: Record<TicketStatus, { base: string; fg: string }> = {
+  recibido: { base: 'var(--st-recibido)', fg: 'var(--st-recibido-fg)' },
+  en_diagnostico: { base: 'var(--st-diagnostico)', fg: 'var(--st-diagnostico-fg)' },
+  en_reparacion: { base: 'var(--st-reparacion)', fg: 'var(--st-reparacion-fg)' },
+  listo: { base: 'var(--st-listo)', fg: 'var(--st-listo-fg)' },
+  entregado: { base: 'var(--st-entregado)', fg: 'var(--st-entregado-fg)' }
 }
 
 export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
@@ -119,6 +127,33 @@ export const PAYMENT_STATUS_COLORS: Record<PaymentStatus, string> = {
   pagado: 'bg-success text-success-foreground'
 }
 
+/**
+ * Tipos que se pueden ELEGIR al recibir un equipo.
+ *
+ * 'laptop' sigue existiendo en EquipmentType y en EQUIPMENT_LABELS a proposito:
+ * hay tickets viejos guardados con ese valor y tienen que seguir mostrandose.
+ * Lo que se quita es la opcion de elegirlo en tickets nuevos, porque en la
+ * practica una laptop se recibe como computadora.
+ */
+export const EQUIPMENT_PICKER_TYPES: readonly EquipmentType[] = [
+  'computadora',
+  'impresora',
+  'monitor',
+  'otro'
+]
+
+/**
+ * Equipos que pueden tener contrasena.
+ *
+ * Una impresora o un monitor no la tienen, asi que ni se pregunta: un campo
+ * que nadie completa es ruido, y la confirmacion de "seguro que no tiene"
+ * seria una pregunta sin sentido. 'otro' entra porque puede ser un telefono
+ * o una tablet.
+ */
+export function equipoPuedeTenerClave(tipo: EquipmentType): boolean {
+  return tipo === 'computadora' || tipo === 'laptop' || tipo === 'otro'
+}
+
 export const EQUIPMENT_LABELS: Record<EquipmentType, string> = {
   impresora: 'Impresora',
   computadora: 'Computadora',
@@ -127,11 +162,14 @@ export const EQUIPMENT_LABELS: Record<EquipmentType, string> = {
   otro: 'Otro'
 }
 
-/** Checkboxes en nuevo ticket e impresión orden de trabajo */
+/**
+ * Checkboxes en nuevo ticket e impresión orden de trabajo.
+ * El orden importa: los tres primeros son los que se marcan casi siempre.
+ */
 export const ACCESSORY_CHECKBOX_LABELS = [
-  'Cable de poder',
-  'Cable USB',
   'Cargador',
+  'Cable USB',
+  'Cable de poder',
   'Mouse',
   'Teclado',
   'Funda',

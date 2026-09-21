@@ -23,6 +23,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -45,29 +46,28 @@ function isRouteActive(pathname: string, href: string) {
 
 function Brand({ compact = false }: { compact?: boolean }) {
   return (
-    <div className={cn('relative flex items-center gap-3', compact ? 'min-w-0' : 'px-6 py-6')}>
-      <div className="relative shrink-0">
-        <div
-          className="absolute inset-0 rounded-xl bg-gradient-brand opacity-60 blur-md"
-          aria-hidden
-        />
-        <Image
-          src="/logo-multiplanet.png"
-          alt="Multiplanet"
-          width={44}
-          height={44}
-          className={cn(
-            'relative rounded-xl bg-white object-contain p-0.5 shadow-lg',
-            compact ? 'size-9' : 'size-11',
-          )}
-        />
-      </div>
+    <div className={cn('flex items-center gap-2.5', compact ? 'min-w-0' : 'px-5 py-5')}>
+      <Image
+        src="/logo-multiplanet.png"
+        alt=""
+        width={36}
+        height={36}
+        // El logo es un circulo blanco con la palabra en negro y las esquinas
+        // transparentes. bg-white no es color decorativo: es la placa que hace
+        // juego con el propio asset, y rounded-full la hace invisible.
+        className={cn('shrink-0 rounded-full bg-white object-contain', compact ? 'size-8' : 'size-9')}
+      />
       <div className="min-w-0">
-        <p className={cn('truncate font-bold leading-tight tracking-tight', compact ? 'text-sm' : 'text-base')}>
-          MULTIPLANET
+        <p
+          className={cn(
+            'truncate font-semibold leading-tight tracking-tight',
+            compact ? 'text-sm' : 'text-[15px]',
+          )}
+        >
+          Multiplanet
         </p>
         {!compact && (
-          <p className="text-xs text-sidebar-foreground/55">Sistema de tickets</p>
+          <p className="text-xs text-muted-foreground">Sistema de tickets</p>
         )}
       </div>
     </div>
@@ -82,8 +82,8 @@ function NavigationList({
   onNavigate?: () => void
 }) {
   return (
-    <nav aria-label="Navegación principal" className="relative flex-1 space-y-1.5 overflow-y-auto px-3 py-5">
-      {navItems.map((item, index) => {
+    <nav aria-label="Navegación principal" className="flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3">
+      {navItems.map((item) => {
         const isActive = isRouteActive(pathname, item.href)
         return (
           <Link
@@ -91,32 +91,21 @@ function NavigationList({
             href={item.href}
             aria-current={isActive ? 'page' : undefined}
             onClick={onNavigate}
-            style={{ animationDelay: `${index * 0.04}s` }}
             className={cn(
-              'group relative flex min-h-12 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-sidebar-ring animate-slide-in-left',
+              'relative flex min-h-11 items-center gap-2.5 rounded-lg px-2.5 text-sm transition-colors',
               isActive
-                ? 'text-white shadow-lg shadow-primary/25'
-                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
+                ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
+                : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
             )}
           >
             {isActive && (
-              <>
-                <span className="absolute inset-0 rounded-xl bg-gradient-brand" aria-hidden />
-                <span
-                  className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-white/90"
-                  aria-hidden
-                />
-              </>
+              <span
+                className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-primary"
+                aria-hidden
+              />
             )}
-            <span
-              className={cn(
-                'relative flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors',
-                isActive ? 'bg-white/15' : 'bg-sidebar-accent/40 group-hover:bg-sidebar-accent',
-              )}
-            >
-              <item.icon className="size-[18px]" />
-            </span>
-            <span className="relative">{item.label}</span>
+            <item.icon className="size-[18px] shrink-0" />
+            <span className="truncate">{item.label}</span>
           </Link>
         )
       })}
@@ -124,16 +113,12 @@ function NavigationList({
   )
 }
 
-function SidebarBackdrop() {
+function SidebarFooter() {
   return (
-    <div
-      className="pointer-events-none absolute inset-0 opacity-60"
-      style={{
-        backgroundImage:
-          'radial-gradient(28rem 20rem at 50% -10%, oklch(0.58 0.22 275 / 0.35), transparent 60%)',
-      }}
-      aria-hidden
-    />
+    <div className="flex items-center justify-between gap-2 border-t border-sidebar-border px-2.5 py-2.5">
+      <p className="truncate pl-2 text-xs text-muted-foreground">Tocoa, Colón</p>
+      <ThemeToggle />
+    </div>
   )
 }
 
@@ -154,14 +139,14 @@ export function Sidebar() {
   return (
     <>
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <header className="glass fixed inset-x-0 top-0 z-40 border-b border-border/70 pt-[env(safe-area-inset-top)] lg:hidden no-print">
+        <header className="fixed inset-x-0 top-0 z-40 border-b border-border bg-background/85 backdrop-blur-sm pt-[env(safe-area-inset-top)] lg:hidden no-print">
           <div className="flex h-16 items-center justify-between gap-3 px-3">
             <SheetTrigger asChild>
               <Button
                 type="button"
-                variant="ghost"
+                variant="outline"
                 size="icon-lg"
-                className="size-11 rounded-xl border border-border/70 bg-card/80 shadow-sm"
+                className="size-11 shrink-0"
                 aria-label="Abrir menú principal"
               >
                 <Menu className="size-5" />
@@ -170,7 +155,7 @@ export function Sidebar() {
 
             <Brand compact />
 
-            <Button asChild size="icon-lg" className="size-11 rounded-xl shadow-md shadow-primary/25">
+            <Button asChild size="icon-lg" className="size-11 shrink-0">
               <Link href="/nuevo-ticket" aria-label="Crear nuevo ticket">
                 <PlusCircle className="size-5" />
               </Link>
@@ -180,10 +165,9 @@ export function Sidebar() {
 
         <SheetContent
           side="left"
-          className="w-[min(88vw,22rem)] gap-0 border-sidebar-border bg-sidebar p-0 text-sidebar-foreground lg:hidden no-print"
+          className="w-[min(88vw,20rem)] gap-0 border-sidebar-border bg-sidebar p-0 text-sidebar-foreground lg:hidden no-print"
         >
-          <SidebarBackdrop />
-          <SheetHeader className="relative border-b border-sidebar-border/70 p-0 text-left">
+          <SheetHeader className="border-b border-sidebar-border p-0 text-left">
             <SheetTitle className="sr-only">Menú principal</SheetTitle>
             <SheetDescription className="sr-only">
               Navega entre las secciones del sistema de tickets.
@@ -191,14 +175,14 @@ export function Sidebar() {
             <Brand />
           </SheetHeader>
           <NavigationList pathname={pathname} onNavigate={() => setMobileOpen(false)} />
-          <div className="relative border-t border-sidebar-border/70 px-6 pb-[max(env(safe-area-inset-bottom),1rem)] pt-4">
-            <p className="text-xs text-sidebar-foreground/45">Multiplanet · Tocoa, Colón</p>
+          <div className="pb-[max(env(safe-area-inset-bottom),0.25rem)]">
+            <SidebarFooter />
           </div>
         </SheetContent>
 
         <nav
           aria-label="Accesos rápidos"
-          className="glass fixed inset-x-0 bottom-0 z-40 border-t border-border/70 pb-[max(env(safe-area-inset-bottom),0.35rem)] pt-1 lg:hidden no-print"
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/85 backdrop-blur-sm pb-[max(env(safe-area-inset-bottom),0.35rem)] pt-1 lg:hidden no-print"
         >
           <div className="grid grid-cols-5 px-1">
             {mobilePrimaryItems.map((item) => {
@@ -209,14 +193,14 @@ export function Sidebar() {
                   href={item.href}
                   aria-current={isActive ? 'page' : undefined}
                   className={cn(
-                    'relative flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[10px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
-                    isActive ? 'text-primary' : 'text-muted-foreground active:bg-muted',
+                    'relative flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg px-1 text-[10px] font-medium transition-colors',
+                    isActive ? 'text-foreground' : 'text-muted-foreground active:bg-muted',
                   )}
                 >
                   {isActive && (
-                    <span className="absolute inset-x-3 top-0 h-0.5 rounded-full bg-gradient-brand" aria-hidden />
+                    <span className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-primary" aria-hidden />
                   )}
-                  <item.icon className={cn('size-5', item.href === '/nuevo-ticket' && 'text-primary')} />
+                  <item.icon className="size-5" />
                   <span>{item.shortLabel}</span>
                 </Link>
               )
@@ -224,7 +208,7 @@ export function Sidebar() {
             <SheetTrigger asChild>
               <button
                 type="button"
-                className="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[10px] font-medium text-muted-foreground outline-none transition-colors active:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg px-1 text-[10px] font-medium text-muted-foreground transition-colors active:bg-muted"
                 aria-label="Ver todas las secciones"
               >
                 <Menu className="size-5" />
@@ -235,15 +219,12 @@ export function Sidebar() {
         </nav>
       </Sheet>
 
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col bg-sidebar text-sidebar-foreground lg:flex no-print">
-        <SidebarBackdrop />
-        <div className="relative border-b border-sidebar-border/70">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex no-print">
+        <div className="border-b border-sidebar-border">
           <Brand />
         </div>
         <NavigationList pathname={pathname} />
-        <div className="relative border-t border-sidebar-border/70 px-6 py-4">
-          <p className="text-xs text-sidebar-foreground/45">Multiplanet · Tocoa, Colón</p>
-        </div>
+        <SidebarFooter />
       </aside>
     </>
   )

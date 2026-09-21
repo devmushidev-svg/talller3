@@ -25,6 +25,7 @@ import {
   ArrowRight,
   Wallet,
   CalendarClock,
+  AlertTriangle,
 } from "lucide-react"
 import {
   Ticket,
@@ -33,11 +34,18 @@ import {
   EQUIPMENT_LABELS,
 } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { StatusPill, statusBase } from "@/components/status-pill"
 import { formatDateOnlyForDisplay } from "@/lib/date-utils"
 import { PhoneActions } from "@/components/phone-actions"
-import { ScrollSafeLink } from "@/components/scroll-safe-link"
+import { ScrollSafeButton } from "@/components/scroll-safe-link"
+import { TicketResumenDialog } from "@/components/ticket-resumen-dialog"
 import { GlobalTicketSearch } from "@/components/global-ticket-search"
 import { buildTicketWhatsAppTemplates } from "@/lib/whatsapp"
+import { toast } from "sonner"
+import { EstadoError } from "@/components/estado-lista"
+import { fetchLista, mensajeDeError } from "@/lib/fetch-lista"
+import { VistaTicketsTabs } from "@/components/vista-tickets-tabs"
+import { VISTAS, ordenarPorFecha, perteneceALaVista, urlDeVista, type Orden, type Vista } from "@/lib/vistas-ticket"
 
 function parseTicket(t: Ticket): Ticket {
   return {
@@ -59,14 +67,6 @@ const statusFlow: TicketStatus[] = [
   "entregado",
 ]
 
-/** Color por estado (variable CSS, se adapta a claro/oscuro) */
-const STATUS_VAR: Record<TicketStatus, string> = {
-  recibido: "var(--chart-1)",
-  en_diagnostico: "var(--warning)",
-  en_reparacion: "var(--chart-2)",
-  listo: "var(--success)",
-  entregado: "var(--muted-foreground)",
-}
 
 interface Stats {
   receivedToday: number
@@ -87,40 +87,64 @@ export default function DashboardPage() {
   const [ticketsLoading, setTicketsLoading] = useState(true)
   const [statusSavingId, setStatusSavingId] = useState<string | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
+  const [ticketsError, setTicketsError] = useState<string | null>(null)
+  const [statsError, setStatsError] = useState<string | null>(null)
+  const [reintento, setReintento] = useState(0)
+  const [ticketAbierto, setTicketAbierto] = useState<Ticket | null>(null)
+  const [vista, setVista] = useState<Vista>("activos")
+  const [orden, setOrden] = useState<Orden>("nuevos")
 
   useEffect(() => {
     let cancelled = false
-    fetch("/api/tickets?scope=active&limit=8")
-      .then((res) => res.json())
+    setTicketsLoading(true)
+    setTicketsError(null)
+    fetchLista<Ticket>(urlDeVista(vista, ""))
       .then((data) => {
         if (cancelled) return
-        const list = Array.isArray(data)
-          ? data.map((t: Ticket) => parseTicket(t)).filter((t: Ticket) => t.status !== "entregado")
-          : []
-        setTickets(list)
+        const deLaVista = data
+          .filter((t) => perteneceALaVista(String(t.status ?? ""), vista))
+          .map((t) => parseTicket(t))
+        setTickets(ordenarPorFecha(deLaVista, orden))
       })
-      .catch(console.error)
+      .catch((e) => {
+        if (cancelled) return
+        console.error(e)
+        // Un 500 no es "no hay tickets". Decirlo asi seria mentir.
+        setTicketsError(mensajeDeError(e))
+        setTickets([])
+      })
       .finally(() => {
         if (!cancelled) setTicketsLoading(false)
       })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [reintento, vista, orden])
 
   useEffect(() => {
     let cancelled = false
+    setStatsError(null)
     fetch("/api/stats")
-      .then((res) => res.json())
-      .then((data) => {
-        if (cancelled || data?.error) return
-        setStats(data as Stats)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`El servidor respondió ${res.status}.`)
+        const data = await res.json()
+        if (data?.error) throw new Error(String(data.error))
+        return data as Stats
       })
-      .catch(console.error)
+      .then((data) => {
+        if (!cancelled) setStats(data)
+      })
+      .catch((e) => {
+        if (cancelled) return
+        console.error(e)
+        // Sin esto, las tarjetas se quedaban en esqueleto de carga para
+        // siempre: parecia que seguia cargando y en realidad habia fallado.
+        setStatsError(mensajeDeError(e))
+      })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [reintento])
 
   const handleStatusChange = async (ticketId: string, newStatus: TicketStatus) => {
     setStatusSavingId(ticketId)
@@ -136,9 +160,23 @@ export default function DashboardPage() {
       })
       if (!res.ok) throw new Error("No se pudo actualizar")
       setTickets((prev) => {
-        if (newStatus === "entregado") return prev.filter((t) => t.id !== ticketId)
+        // El ticket se va de la lista solo si su nuevo estado ya no cae en la
+        // vista abierta. En "Entregados" o "Todos", entregarlo lo deja donde
+        // esta en vez de hacerlo desaparecer de golpe.
+        if (!perteneceALaVista(newStatus, vista)) {
+          return prev.filter((t) => t.id !== ticketId)
+        }
         return prev.map((t) => (t.id === ticketId ? { ...t, status: newStatus } : t))
       })
+      // Entregado sale de la lista, asi que la ventana se cierra sola; en el
+      // resto se actualiza para que la pildora no quede mostrando lo viejo.
+      setTicketAbierto((abierto) =>
+        abierto?.id !== ticketId
+          ? abierto
+          : perteneceALaVista(newStatus, vista)
+            ? { ...abierto, status: newStatus }
+            : null
+      )
       if (newStatus === "entregado") {
         setStats((previous) =>
           previous
@@ -152,37 +190,35 @@ export default function DashboardPage() {
       }
     } catch (e) {
       console.error(e)
-      alert("No se pudo cambiar el estado")
+      toast.error("No se pudo cambiar el estado")
     } finally {
       setStatusSavingId(null)
     }
   }
 
-  const statCards = [
-    {
-      title: "Recibidos hoy",
-      value: stats?.receivedToday,
-      icon: Package,
-      tint: "var(--chart-1)",
-    },
-    {
-      title: "Activos",
-      value: stats?.activeTickets,
-      icon: ClipboardList,
-      tint: "var(--warning)",
-    },
+  /**
+   * Quien abre el inicio pregunta una sola cosa: que tengo que entregar y
+   * cuanto trabajo hay adentro. Esos dos numeros van grandes. Todo lo demas
+   * es contexto y va chico, en una linea.
+   */
+  const principales = [
     {
       title: "Listos para entrega",
       value: stats?.readyForPickup,
-      icon: CheckCircle,
-      tint: "var(--success)",
+      hint: "esperando que el cliente pase",
+      href: "/tickets-activos?status=listo",
     },
     {
-      title: "Entregados hoy",
-      value: stats?.deliveredToday,
-      icon: Truck,
-      tint: "var(--chart-2)",
+      title: "En taller",
+      value: stats?.activeTickets,
+      hint: "equipos sin entregar",
+      href: "/tickets-activos",
     },
+  ]
+
+  const hoy = [
+    { title: "Recibidos hoy", value: stats?.receivedToday },
+    { title: "Entregados hoy", value: stats?.deliveredToday },
   ]
 
   const displayId = (t: Ticket) =>
@@ -194,14 +230,14 @@ export default function DashboardPage() {
     Array.isArray(t.accessories) ? t.accessories.filter(Boolean) : []
 
   // La API ya entrega los tickets del más reciente al más antiguo.
-  const recentTickets = tickets.slice(0, 8)
-  const activeTicketCount = stats?.activeTickets ?? null
+  // El inicio es un resumen: muestra un tope y remite a la lista completa.
+  const TOPE_EN_INICIO = 12
+  const recentTickets = tickets.slice(0, TOPE_EN_INICIO)
 
   return (
     <DashboardLayout>
       <div className="space-y-8">
         <PageHeader
-          icon={LayoutDashboard}
           title="Inicio"
           description="Resumen del taller y tickets activos."
           action={
@@ -216,76 +252,86 @@ export default function DashboardPage() {
 
         <GlobalTicketSearch />
 
-        {/* ── Estadísticas ───────────────────────────── */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 stagger">
-          {statCards.map((c) => (
-            <div
+        {/* ── Lo que hay que hacer ahora ─────────────── */}
+        <div className="grid gap-3 sm:grid-cols-2">
+          {principales.map((c) => (
+            <Link
               key={c.title}
-              className="hover-lift relative overflow-hidden rounded-2xl border border-border/70 bg-card p-4 sm:p-5"
+              href={c.href}
+              className="group rounded-2xl border border-border bg-card p-5 transition-colors hover:border-input"
             >
-              <div
-                className="absolute -right-6 -top-6 h-20 w-20 rounded-full opacity-[0.12]"
-                style={{ background: c.tint }}
-                aria-hidden
-              />
-              <div className="flex items-center gap-3">
-                <span
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
-                  style={{
-                    backgroundColor: `color-mix(in oklch, ${c.tint} 15%, transparent)`,
-                    color: c.tint,
-                  }}
-                >
-                  <c.icon className="h-5 w-5" />
-                </span>
-                <div className="min-w-0">
-                  {c.value == null ? (
-                    <div className="h-7 w-10 rounded-md shimmer" />
-                  ) : (
-                    <p className="text-2xl font-bold leading-none tabular-nums">
-                      {c.value}
-                    </p>
-                  )}
-                  <p className="mt-1 truncate text-xs text-muted-foreground">
-                    {c.title}
+              <p className="text-sm text-muted-foreground">{c.title}</p>
+              {c.value == null ? (
+                statsError ? (
+                  <p className="mt-1 text-4xl font-semibold leading-none text-muted-foreground">
+                    —
                   </p>
-                </div>
-              </div>
-            </div>
+                ) : (
+                  <div className="mt-2 h-10 w-16 rounded-md shimmer" />
+                )
+              ) : (
+                <p className="mt-1 text-4xl font-semibold leading-none tabular">
+                  {c.value}
+                </p>
+              )}
+              <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                {c.hint}
+                <ArrowRight className="size-3 opacity-0 transition-opacity group-hover:opacity-100" />
+              </p>
+            </Link>
           ))}
         </div>
 
-        {/* Métricas secundarias */}
-        {stats && (
-          <div className="grid gap-3 sm:grid-cols-3 stagger">
-            <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card p-4">
-              <CalendarClock className="h-5 w-5 shrink-0 text-primary" />
-              <div className="text-sm">
-                <p className="font-semibold">Esta semana</p>
-                <p className="text-muted-foreground">
-                  {stats.weekTickets} tickets · L. {stats.weekRevenue.toFixed(2)}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card p-4">
-              <Truck className="h-5 w-5 shrink-0 text-chart-2" />
-              <div className="text-sm">
-                <p className="font-semibold">Este mes</p>
-                <p className="text-muted-foreground">
-                  {stats.monthDelivered} entregados · L. {stats.monthRevenue.toFixed(2)}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card p-4">
-              <Wallet className="h-5 w-5 shrink-0 text-amber-500" />
-              <div className="text-sm">
-                <p className="font-semibold">Por cobrar</p>
-                <p className="text-muted-foreground">
-                  L. {stats.pendingPayments.toFixed(2)} · {stats.avgRepairDays} días prom.
-                </p>
-              </div>
-            </div>
+        {/* Contexto del dia: una linea, no tres tarjetas */}
+        {statsError ? (
+          <div
+            role="alert"
+            className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-border bg-card px-5 py-3.5 text-sm"
+          >
+            <span className="flex items-center gap-2 font-medium">
+              <AlertTriangle
+                className="size-4 shrink-0"
+                style={{ color: "var(--danger)" }}
+                aria-hidden
+              />
+              No se pudieron cargar las cifras
+            </span>
+            <span className="text-muted-foreground">{statsError}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-auto"
+              onClick={() => setReintento((n) => n + 1)}
+            >
+              Reintentar
+            </Button>
           </div>
+        ) : (
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl border border-border bg-card px-5 py-3.5 text-sm">
+          {hoy.map((c) => (
+            <span key={c.title} className="flex items-baseline gap-1.5">
+              <span className="font-medium tabular">
+                {c.value ?? "—"}
+              </span>
+              <span className="text-muted-foreground">{c.title.toLowerCase()}</span>
+            </span>
+          ))}
+          {stats && (
+            <span className="flex items-baseline gap-1.5">
+              <span className="font-medium tabular" data-money>
+                L. {stats.pendingPayments.toFixed(2)}
+              </span>
+              <span className="text-muted-foreground">por cobrar</span>
+            </span>
+          )}
+          {stats && (
+            <span className="ml-auto text-xs text-muted-foreground tabular">
+              Semana: {stats.weekTickets} tickets · L. {stats.weekRevenue.toFixed(2)}
+              {"  ·  "}
+              Mes: {stats.monthDelivered} entregados · L. {stats.monthRevenue.toFixed(2)}
+            </span>
+          )}
+        </div>
         )}
 
         {/* ── Tickets en taller ──────────────────────── */}
@@ -293,34 +339,41 @@ export default function DashboardPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="flex items-center gap-2 text-lg font-semibold">
               <ClipboardList className="h-5 w-5 text-primary" />
-              En taller
-              {activeTicketCount !== null && (
+              {VISTAS.find((v) => v.id === vista)?.label}
+              {!ticketsLoading && (
                 <Badge variant="secondary" className="font-normal">
-                  {activeTicketCount} activo{activeTicketCount !== 1 ? "s" : ""}
+                  {tickets.length} equipo{tickets.length !== 1 ? "s" : ""}
                 </Badge>
               )}
             </h2>
             <div className="flex items-center gap-3">
-              {activeTicketCount !== null && activeTicketCount > recentTickets.length && (
+              {tickets.length > recentTickets.length && (
                 <span className="hidden text-xs text-muted-foreground sm:inline">
-                  Mostrando los {recentTickets.length} más recientes
+                  Mostrando {recentTickets.length} de {tickets.length}
                 </span>
               )}
               <Button variant="outline" size="sm" asChild>
                 <Link href="/tickets-activos">
-                  Lista completa y filtros
+                  Lista completa
                   <ArrowRight className="ml-1.5 h-4 w-4" />
                 </Link>
               </Button>
             </div>
           </div>
 
+          <VistaTicketsTabs
+            vista={vista}
+            onVistaChange={setVista}
+            orden={orden}
+            onOrdenChange={setOrden}
+          />
+
           {ticketsLoading ? (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div
                   key={i}
-                  className="h-52 rounded-2xl border border-border/70 bg-card p-5"
+                  className="h-52 rounded-2xl border border-border bg-card p-5"
                 >
                   <div className="h-5 w-24 rounded shimmer" />
                   <div className="mt-4 h-6 w-40 rounded shimmer" />
@@ -329,9 +382,14 @@ export default function DashboardPage() {
                 </div>
               ))}
             </div>
+          ) : ticketsError ? (
+            <EstadoError
+              mensaje={ticketsError}
+              onReintentar={() => setReintento((n) => n + 1)}
+            />
           ) : tickets.length === 0 ? (
-            <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-card/50 py-16 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-brand-soft">
+            <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-card py-16 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
                 <ClipboardList className="h-8 w-8 text-primary" />
               </div>
               <div>
@@ -348,39 +406,34 @@ export default function DashboardPage() {
               </Button>
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 stagger">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {recentTickets.map((ticket) => {
-                const color = STATUS_VAR[ticket.status]
+                const color = statusBase(ticket.status)
                 const waTemplates = buildTicketWhatsAppTemplates(ticket)
                 return (
                   <article
                     key={ticket.id}
-                    className="hover-lift group relative flex flex-col overflow-hidden rounded-2xl border border-border/70 bg-card"
+                    className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-colors hover:border-input"
                   >
                     {/* Barra de acento por estado */}
                     <span
-                      className="absolute inset-y-0 left-0 w-1.5"
+                      className="absolute inset-y-0 left-0 w-1"
                       style={{ background: color }}
                       aria-hidden
                     />
 
-                    <ScrollSafeLink
-                      href={`/tickets-activos?ticketId=${encodeURIComponent(ticket.id)}`}
-                      className="block flex-1 touch-pan-y space-y-3 p-5 pl-6 outline-none active:bg-muted/30 focus-visible:bg-muted/40"
+                    {/* Abre el resumen en una ventana. Antes navegaba a otra
+                        pantalla y cortaba lo que se estaba haciendo. */}
+                    <ScrollSafeButton
+                      onClick={() => setTicketAbierto(ticket)}
+                      aria-label={`Ver ticket ${displayId(ticket)} de ${ticket.client_name}`}
+                      className="block w-full flex-1 touch-pan-y space-y-3 p-5 pl-6 text-left outline-none active:bg-muted/30 focus-visible:bg-muted/40"
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-sm font-bold text-primary">
                           {displayId(ticket)}
                         </span>
-                        <span
-                          className="rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                          style={{
-                            backgroundColor: `color-mix(in oklch, ${color} 16%, transparent)`,
-                            color,
-                          }}
-                        >
-                          {STATUS_LABELS[ticket.status]}
-                        </span>
+                        <StatusPill status={ticket.status} />
                         <Badge variant="secondary" className="text-[11px] font-medium">
                           {EQUIPMENT_LABELS[ticket.equipment_type] ?? ticket.equipment_type}
                         </Badge>
@@ -400,10 +453,10 @@ export default function DashboardPage() {
                           <span>· {accList(ticket).length} accesorio{accList(ticket).length !== 1 ? "s" : ""}</span>
                         )}
                       </div>
-                    </ScrollSafeLink>
+                    </ScrollSafeButton>
 
                     {/* Pie: contacto + cambio rápido de estado */}
-                    <div className="space-y-2.5 border-t border-border/70 bg-muted/30 px-5 py-3 pl-6">
+                    <div className="space-y-2.5 border-t border-border bg-muted/30 px-5 py-3 pl-6">
                       <div className="flex items-center justify-between gap-2">
                         <span className="flex items-center gap-1.5 text-sm font-medium">
                           <Smartphone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -413,6 +466,8 @@ export default function DashboardPage() {
                           phone={ticket.client_phone}
                           templates={waTemplates}
                           size="sm"
+                          preguntarMarcarListo={ticket.status !== "listo"}
+                          marcarListo={() => handleStatusChange(ticket.id, "listo")}
                         />
                       </div>
                       <div className="flex items-center gap-2">
@@ -446,6 +501,14 @@ export default function DashboardPage() {
           )}
         </section>
       </div>
+
+      <TicketResumenDialog
+        ticket={ticketAbierto}
+        abierto={ticketAbierto !== null}
+        onAbiertoChange={(a) => !a && setTicketAbierto(null)}
+        onCambiarEstado={handleStatusChange}
+        guardandoEstado={statusSavingId === ticketAbierto?.id}
+      />
     </DashboardLayout>
   )
 }

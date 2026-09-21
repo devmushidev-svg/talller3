@@ -52,6 +52,9 @@ import {
   Layers,
   Ruler,
 } from "lucide-react"
+import { toast } from "sonner"
+import { fetchLista, mensajeDeError } from "@/lib/fetch-lista"
+import { EstadoError } from "@/components/estado-lista"
 
 interface PartFormData {
   name: string
@@ -91,14 +94,17 @@ export default function InventarioPage() {
   const [formData, setFormData] = useState<PartFormData>(emptyPart)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const fetchParts = async () => {
+    setLoading(true)
+    setLoadError(null)
     try {
-      const response = await fetch("/api/parts")
-      const data = await response.json()
-      setParts(data)
+      setParts(await fetchLista<Part>("/api/parts"))
     } catch (error) {
       console.error("Error fetching parts:", error)
+      setLoadError(mensajeDeError(error))
+      setParts([])
     } finally {
       setLoading(false)
     }
@@ -118,7 +124,7 @@ export default function InventarioPage() {
   })
 
   const totalUnits = parts.reduce((sum, p) => sum + (p.quantity || 0), 0)
-  const categoriesInUse = new Set(parts.map((p) => p.category)).size
+  const lowStockParts = parts.filter((part) => (part.quantity || 0) <= 2).length
 
   const handleOpenDialog = (part?: Part) => {
     if (part) {
@@ -141,7 +147,7 @@ export default function InventarioPage() {
 
   const handleSave = async () => {
     if (!formData.name || !formData.category) {
-      alert("Por favor complete los campos obligatorios")
+      toast.error("Por favor complete los campos obligatorios")
       return
     }
 
@@ -183,38 +189,10 @@ export default function InventarioPage() {
     }
   }
 
-  const statCards = [
-    {
-      title: "Piezas distintas",
-      value: parts.length,
-      icon: Package,
-      tint: "var(--chart-1)",
-    },
-    {
-      title: "Unidades en stock",
-      value: totalUnits,
-      icon: Boxes,
-      tint: "var(--chart-2)",
-    },
-    {
-      title: "Categorías activas",
-      value: categoriesInUse,
-      icon: Layers,
-      tint: "var(--warning)",
-    },
-    {
-      title: "Resultados visibles",
-      value: filteredParts.length,
-      icon: Tag,
-      tint: "var(--success)",
-    },
-  ]
-
   return (
     <DashboardLayout>
       <div className="space-y-8">
         <PageHeader
-          icon={Package}
           title="Inventario de Piezas"
           description={`${parts.length} pieza${parts.length !== 1 ? "s" : ""} almacenada${parts.length !== 1 ? "s" : ""} en el taller.`}
           action={
@@ -226,42 +204,35 @@ export default function InventarioPage() {
         />
 
         {/* ── Métricas ───────────────────────────── */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 stagger">
-          {statCards.map((c) => (
-            <div
-              key={c.title}
-              className="hover-lift relative overflow-hidden rounded-2xl border border-border/70 bg-card p-4 sm:p-5"
-            >
-              <div
-                className="absolute -right-6 -top-6 h-20 w-20 rounded-full opacity-[0.12]"
-                style={{ background: c.tint }}
-                aria-hidden
-              />
-              <div className="flex items-center gap-3">
-                <span
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
-                  style={{
-                    backgroundColor: `color-mix(in oklch, ${c.tint} 15%, transparent)`,
-                    color: c.tint,
-                  }}
-                >
-                  <c.icon className="h-5 w-5" />
-                </span>
-                <div className="min-w-0">
-                  {loading ? (
-                    <div className="h-7 w-10 rounded-md shimmer" />
-                  ) : (
-                    <p className="text-2xl font-bold leading-none tabular-nums">
-                      {c.value}
-                    </p>
-                  )}
-                  <p className="mt-1 truncate text-xs text-muted-foreground">
-                    {c.title}
-                  </p>
-                </div>
-              </div>
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="flex items-start gap-4">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+              <Package className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm text-muted-foreground">Piezas por reponer</p>
+              {loading ? (
+                <div className="mt-2 h-10 w-16 rounded-md shimmer" />
+              ) : (
+                <p className="mt-1 text-4xl font-semibold leading-none tabular-nums">
+                  {lowStockParts}
+                </p>
+              )}
+              <p className="mt-2 text-xs text-muted-foreground">
+                con 2 unidades o menos
+              </p>
             </div>
-          ))}
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-border pt-3 text-sm">
+            <span>
+              <span className="font-medium tabular-nums">{loading ? "—" : totalUnits}</span>{" "}
+              <span className="text-muted-foreground">unidades en stock</span>
+            </span>
+            <span>
+              <span className="font-medium tabular-nums">{loading ? "—" : parts.length}</span>{" "}
+              <span className="text-muted-foreground">piezas distintas</span>
+            </span>
+          </div>
         </div>
 
         {/* ── Filtros ───────────────────────────── */}
@@ -311,7 +282,7 @@ export default function InventarioPage() {
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className="h-44 rounded-2xl border border-border/70 bg-card p-5"
+                className="h-44 rounded-2xl border border-border bg-card p-5"
               >
                 <div className="h-5 w-28 rounded shimmer" />
                 <div className="mt-4 h-6 w-40 rounded shimmer" />
@@ -320,9 +291,11 @@ export default function InventarioPage() {
               </div>
             ))}
           </div>
+        ) : loadError ? (
+          <EstadoError mensaje={loadError} onReintentar={fetchParts} />
         ) : filteredParts.length === 0 ? (
-          <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-card/50 py-16 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-brand-soft">
+          <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-card py-16 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
               <Package className="h-8 w-8 text-primary" />
             </div>
             <div>
@@ -341,14 +314,14 @@ export default function InventarioPage() {
             )}
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 stagger">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {filteredParts.map((part) => {
               const condition = (part.condition as PartCondition) || "bueno"
               const color = CONDITION_VAR[condition] || CONDITION_VAR.bueno
               return (
                 <article
                   key={part.id}
-                  className="hover-lift group relative flex flex-col overflow-hidden rounded-2xl border border-border/70 bg-card"
+                  className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card"
                 >
                   {/* Barra de acento por condición */}
                   <span
@@ -421,7 +394,7 @@ export default function InventarioPage() {
                   </div>
 
                   {/* Pie: acciones */}
-                  <div className="flex items-center justify-end gap-1 border-t border-border/70 bg-muted/30 px-5 py-2.5 pl-6">
+                  <div className="flex items-center justify-end gap-1 border-t border-border bg-muted/30 px-5 py-2.5 pl-6">
                     <Button
                       variant="ghost"
                       size="sm"

@@ -115,7 +115,7 @@ export function QRScanner({ onScan }: QRScannerProps) {
           <DialogTitle>Escanear Código QR del Ticket</DialogTitle>
         </DialogHeader>
         
-        <div className="relative aspect-square bg-black rounded-lg overflow-hidden">
+        <div className="relative aspect-square overflow-hidden rounded-lg bg-background">
           <video
             ref={videoRef}
             className="w-full h-full object-cover"
@@ -138,8 +138,8 @@ export function QRScanner({ onScan }: QRScannerProps) {
           </div>
 
           {error && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/80">
-              <div className="text-center text-white p-4">
+            <div className="absolute inset-0 flex items-center justify-center bg-background/90">
+              <div className="p-4 text-center text-foreground">
                 <p className="mb-4">{error}</p>
                 <Button variant="secondary" onClick={startScanning}>
                   Reintentar

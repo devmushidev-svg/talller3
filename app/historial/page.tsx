@@ -34,21 +34,25 @@ import {
 import { formatDateOnlyForDisplay } from "@/lib/date-utils"
 import { PhoneActions } from "@/components/phone-actions"
 import { buildTicketWhatsAppTemplates } from "@/lib/whatsapp"
+import { StatusPill } from "@/components/status-pill"
+import { fetchLista, mensajeDeError } from "@/lib/fetch-lista"
+import { EstadoError } from "@/components/estado-lista"
 
 /** Color del estado "entregado" (variable CSS, se adapta a claro/oscuro) */
-const DELIVERED_COLOR = "var(--muted-foreground)"
+const DELIVERED_COLOR = "var(--st-entregado)"
 
 export default function HistorialPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
-  useEffect(() => {
-    const fetchTickets = async () => {
+  const fetchTickets = async () => {
+      setLoading(true)
+      setLoadError(null)
       try {
-        const response = await fetch("/api/tickets")
-        const data = await response.json()
+        const data = await fetchLista<Ticket>("/api/tickets")
 
         // Parse accessories and filter completed tickets
         const completedTickets = data
@@ -63,11 +67,14 @@ export default function HistorialPage() {
         setTickets(completedTickets)
       } catch (error) {
         console.error("Error fetching tickets:", error)
+        setLoadError(mensajeDeError(error))
+        setTickets([])
       } finally {
         setLoading(false)
       }
     }
 
+  useEffect(() => {
     fetchTickets()
   }, [])
 
@@ -115,7 +122,6 @@ export default function HistorialPage() {
     <DashboardLayout>
       <div className="space-y-8">
         <PageHeader
-          icon={History}
           title="Historial"
           description={
             loading
@@ -171,11 +177,21 @@ export default function HistorialPage() {
                       </TableCell>
                     </TableRow>
                   ))
+                ) : loadError ? (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={7} className="p-0">
+                      <EstadoError
+                        mensaje={loadError}
+                        onReintentar={fetchTickets}
+                        className="border-0 bg-transparent"
+                      />
+                    </TableCell>
+                  </TableRow>
                 ) : filteredTickets.length === 0 ? (
                   <TableRow className="hover:bg-transparent">
                     <TableCell colSpan={7} className="p-0">
                       <div className="flex flex-col items-center gap-4 py-16 text-center">
-                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-brand-soft">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
                           <PackageOpen className="h-8 w-8 text-primary" />
                         </div>
                         <div>
@@ -273,21 +289,13 @@ export default function HistorialPage() {
                   <span className="font-mono text-sm font-bold text-primary">
                     {displayId(selectedTicket)}
                   </span>
-                  <span
-                    className="rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                    style={{
-                      backgroundColor: `color-mix(in oklch, ${DELIVERED_COLOR} 16%, transparent)`,
-                      color: DELIVERED_COLOR,
-                    }}
-                  >
-                    Entregado
-                  </span>
+                  <StatusPill status="entregado" />
                 </DialogTitle>
               </DialogHeader>
 
               <div className="space-y-6 pt-2">
                 {/* Client Info */}
-                <div className="grid grid-cols-2 gap-4 rounded-2xl border border-border/70 bg-muted/30 p-4">
+                <div className="grid grid-cols-2 gap-4 rounded-2xl border border-border bg-muted/30 p-4">
                   <div>
                     <p className="text-xs uppercase tracking-wide text-muted-foreground">
                       Cliente
@@ -432,7 +440,7 @@ export default function HistorialPage() {
 
                 {/* Total */}
                 {selectedTicket.total_cost ? (
-                  <div className="flex items-center justify-between rounded-2xl border border-border/70 bg-gradient-brand-soft p-4">
+                  <div className="flex items-center justify-between rounded-2xl border border-border bg-muted p-4">
                     <div className="flex items-center gap-2.5">
                       <Wallet className="h-5 w-5 text-primary" />
                       <p className="text-sm font-medium text-muted-foreground">
